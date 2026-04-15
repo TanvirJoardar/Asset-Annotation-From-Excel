@@ -70,7 +70,7 @@ function PreviewCanvas({ fileHandle, annotations, options }) {
 
   useEffect(() => {
     let active = true;
-    const renderPreview = async () => {
+      const renderPreview = async () => {
       if (!fileHandle || !canvasRef.current) return;
       const file = await fileHandle.getFile();
       const bmp = await createImageBitmap(file);
@@ -79,6 +79,8 @@ function PreviewCanvas({ fileHandle, annotations, options }) {
 
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
+      
+      // Set canvas to image dimensions
       canvas.width = bmp.width;
       canvas.height = bmp.height;
 
@@ -117,7 +119,7 @@ function PreviewCanvas({ fileHandle, annotations, options }) {
     return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Missing</div>;
   }
 
-  return <canvas ref={canvasRef} />;
+  return <canvas ref={canvasRef} style={{ display: 'block' }} />;
 }
 
 export default function App() {
@@ -144,6 +146,9 @@ export default function App() {
     setImageHandles(new Map());
     setStats({ excelFiles: 0, annotationsFound: 0, distinctImages: 0 });
   };
+  const [selectedPreview, setSelectedPreview] = useState(null);
+  const [modalZoom, setModalZoom] = useState(1);
+  const modalContentRef = useRef(null);
 
   const selectFolder = async () => {
     try {
@@ -387,6 +392,7 @@ export default function App() {
                 </select>
               </div>
             )}
+            
             <div className="option-group">
               <label>Output DPI</label>
               <select 
@@ -471,7 +477,12 @@ export default function App() {
                 const handle = imageHandles.get(imgName);
                 const isMissing = !handle;
                 return (
-                  <div key={imgName} className={`preview-card ${isMissing ? 'missing' : ''}`}>
+                  <div
+                    key={imgName}
+                    className={`preview-card ${isMissing ? 'missing' : ''}`}
+                    onClick={() => { if (!isMissing) setSelectedPreview(imgName); }}
+                    style={{ cursor: isMissing ? 'default' : 'pointer' }}
+                  >
                     <div className="preview-image-container">
                       <PreviewCanvas fileHandle={handle} annotations={annotations} options={options} />
                     </div>
@@ -485,10 +496,214 @@ export default function App() {
                 );
               })}
             </div>
+            
           </div>
         </>
       )}
 
+      {/* Modal rendered at top-level of app container so it overlays correctly */}
+      <ModalPreview
+        selectedPreview={selectedPreview}
+        setSelectedPreview={setSelectedPreview}
+        imageHandles={imageHandles}
+        dataMap={dataMap}
+        options={options}
+        modalZoom={modalZoom}
+        setModalZoom={setModalZoom}
+        modalContentRef={modalContentRef}
+      />
+
     </div>
   );
 }
+
+// Render modal at root of component so it overlays correctly
+function ModalPreview({ selectedPreview, setSelectedPreview, imageHandles, dataMap, options, modalZoom, setModalZoom, modalContentRef }) {
+  const scrollRef = useRef(null);
+  const isPanningRef = useRef(false);
+  const startRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0, pointerId: null });
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') setSelectedPreview(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [setSelectedPreview]);
+
+  // Load image size when preview changes and calculate initial fit zoom
+  useEffect(() => {
+    if (!selectedPreview) return;
+    const loadImageSize = async () => {
+      const handle = imageHandles.get(selectedPreview);
+      if (!handle || !modalContentRef.current) return;
+      try {
+        const file = await handle.getFile();
+        const bmp = await createImageBitmap(file);
+        const size = { width: bmp.width, height: bmp.height };
+        setImageSize(size);
+        
+        // Calculate initial fit zoom - how much we need to scale to fit
+        const container = modalContentRef.current;
+        const availW = container.clientWidth - 64; // account for padding
+        const availH = container.clientHeight - 120; // account for controls
+        // Calculate scale factor to fit image in container (can be > 1 if image is smaller)
+        const fitScale = Math.min(availW / size.width, availH / size.height);
+        // Start with fit scale, but cap at 1 (don't upscale small images beyond natural size)
+        const initialZoom = Math.min(1, fitScale);
+        setModalZoom(initialZoom);
+        
+        bmp.close();
+      } catch (e) {
+        console.warn('Failed to load image size:', e);
+        setModalZoom(1);
+      }
+    };
+    loadImageSize();
+  }, [selectedPreview, imageHandles]);
+
+  if (!selectedPreview) return null;
+  const handle = imageHandles.get(selectedPreview);
+
+  const onPointerDown = (e) => {
+    if (!scrollRef.current) return;
+    isPanningRef.current = true;
+    startRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: scrollRef.current.scrollLeft,
+      scrollTop: scrollRef.current.scrollTop,
+      pointerId: e.pointerId
+    };
+    e.target.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e) => {
+    if (!isPanningRef.current || !scrollRef.current) return;
+    const dx = e.clientX - startRef.current.x;
+    const dy = e.clientY - startRef.current.y;
+    scrollRef.current.scrollLeft = startRef.current.scrollLeft - dx;
+    scrollRef.current.scrollTop = startRef.current.scrollTop - dy;
+  };
+
+  const onPointerUp = (e) => {
+    if (!isPanningRef.current) return;
+    isPanningRef.current = false;
+    try { e.target.releasePointerCapture(e.pointerId); } catch (err) {}
+  };
+
+  return (
+    <div
+      className="modal-overlay"
+      onClick={(e) => { if (e.target === e.currentTarget) setSelectedPreview(null); }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.6)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999
+      }}
+    >
+      <div
+        className="modal-content"
+        ref={modalContentRef}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'relative',
+          background: 'var(--surface, #fff)',
+          padding: '16px',
+          borderRadius: '8px',
+          width: '95vw',
+          height: '95vh',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        {/* Visible floating controls (top-right) */}
+        <div 
+          style={{ position: 'absolute', top: 12, right: 12, zIndex: 10001 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.55)', padding: '6px', borderRadius: 6 }}>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setModalZoom(z => Math.max(0.1, z / 1.25)); }}
+              style={{ background: 'white', color: '#111', border: 'none', padding: '6px 8px', borderRadius: 4, cursor: 'pointer' }}
+            >-</button>
+            <button
+              type="button"
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                // Calculate fit zoom based on image size vs container size
+                if (imageSize.width > 0 && modalContentRef.current) {
+                  const container = modalContentRef.current;
+                  const availW = container.clientWidth - 64; // account for padding
+                  const availH = container.clientHeight - 120; // account for controls
+                  const fitScale = Math.min(availW / imageSize.width, availH / imageSize.height);
+                  const fitZoom = Math.min(1, fitScale);
+                  setModalZoom(fitZoom);
+                } else {
+                  setModalZoom(1);
+                }
+                // Reset scroll position
+                if (scrollRef.current) {
+                  scrollRef.current.scrollLeft = 0;
+                  scrollRef.current.scrollTop = 0;
+                }
+              }}
+              style={{ background: 'white', color: '#111', border: 'none', padding: '6px 8px', borderRadius: 4, cursor: 'pointer' }}
+            >Fit</button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setModalZoom(z => Math.min(8, z * 1.25)); }}
+              style={{ background: 'white', color: '#111', border: 'none', padding: '6px 8px', borderRadius: 4, cursor: 'pointer' }}
+            >+</button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-secondary" onClick={(e) => { e.stopPropagation(); setSelectedPreview(null); }}>Close</button>
+        </div>
+
+        <div
+          ref={scrollRef}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          style={{ 
+            flex: 1, 
+            overflow: modalZoom > 1 ? 'auto' : 'hidden', 
+            position: 'relative', 
+            cursor: isPanningRef.current ? 'grabbing' : (modalZoom > 1 ? 'grab' : 'default'),
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div style={{ 
+            position: 'relative',
+            transformOrigin: 'center center',
+            transform: `scale(${modalZoom})`,
+            transition: 'none', // Remove transition for instant response
+            willChange: 'transform' // Hint for GPU acceleration
+          }}>
+            <PreviewCanvas 
+              fileHandle={handle} 
+              annotations={dataMap.get(selectedPreview)} 
+              options={options}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export { ModalPreview };
