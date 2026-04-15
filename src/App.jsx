@@ -36,9 +36,12 @@ const drawCirclesOnImage = async (fileHandle, annotations, options) => {
     ctx.fill();
 
     if (options.drawText) {
+      const labelText = options.labelType === 'displayName'
+        ? (ann.displayName || ann.id || '')
+        : (ann.id || ann.displayName || '');
       ctx.font = `bold ${options.radius}px Inter`;
       ctx.fillStyle = options.color;
-      ctx.fillText(ann.id || '', rawX + options.radius + 5, rawY + 5);
+      ctx.fillText(labelText, rawX + options.radius + 5, rawY + 5);
     }
   });
 
@@ -97,9 +100,12 @@ function PreviewCanvas({ fileHandle, annotations, options }) {
         ctx.fill();
 
         if (options.drawText) {
+          const labelText = options.labelType === 'displayName'
+            ? (ann.displayName || ann.id || '')
+            : (ann.id || ann.displayName || '');
           ctx.font = `bold ${options.radius}px Arial`;
           ctx.fillStyle = options.color;
-          ctx.fillText(ann.id || '', rawX + options.radius + 5, rawY + 5);
+          ctx.fillText(labelText, rawX + options.radius + 5, rawY + 5);
         }
       });
     };
@@ -127,7 +133,8 @@ export default function App() {
     color: '#ef4444',
     drawText: true,
     radius: 15,
-    dpi: 300
+    dpi: 300,
+    labelType: 'displayName' // 'displayName' or 'sensorId'
   });
 
   const resetApp = () => {
@@ -196,39 +203,69 @@ export default function App() {
 
       if (headerRowIndex === -1) {
         alert("Could not detect standard columns ('Coordinates', 'Background Image Name') in the spreadsheet.");
+        resetApp();
         setIsProcessing(false);
         return;
       }
 
       const colSensorId = headers.findIndex(h => h && h.toString().trim() === 'Sensor Id');
+      const colDisplayName = headers.findIndex(h => h && /display\s*name/i.test(h.toString()));
       const colCoords = headers.findIndex(h => h && h.toString().trim() === 'Coordinates');
       const colImage = headers.findIndex(h => h && (h.toString().trim() === 'Background Image Name' || h.toString().trim() === 'Background Image'));
 
-      if (colCoords === -1 || colImage === -1) {
-        alert("Missing crucial columns: 'Coordinates' or 'Background Image Name'");
+      const missingCols = [];
+      if (colCoords === -1) missingCols.push('Coordinates');
+      if (colImage === -1) missingCols.push('Background Image Name');
+      if (missingCols.length > 0) {
+        alert("Missing crucial columns: " + missingCols.join(', '));
+        resetApp();
         setIsProcessing(false);
         return;
       }
 
+      if (colSensorId === -1 && colDisplayName === -1) {
+        alert("Warning: Neither 'Sensor Id' nor 'Sensor Display Name' columns were found. Labels will be empty.");
+      }
+
       let dMap = new Map();
       let annCount = 0;
+      let invalidCoordsCount = 0;
+      const invalidExamples = [];
 
       for (let i = headerRowIndex + 1; i < jsonRaw.length; i++) {
         const row = jsonRaw[i];
         if (!row || row.length === 0) continue;
 
         const sensorId = row[colSensorId] || '';
+        const sensorDisplayName = (colDisplayName !== -1) ? (row[colDisplayName] || '') : '';
         const coords = row[colCoords];
         const imageName = row[colImage];
 
         if (coords && imageName) {
+          const coordsStr = coords.toString().trim();
           const cleanedImageName = imageName.toString().trim();
+
+          // Validate coordinates: must be two numbers separated by a space (e.g. "123 456" or "12.3 -45.6")
+          const coordRegex = /^\s*-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?\s*$/;
+          if (!coordRegex.test(coordsStr)) {
+            invalidCoordsCount++;
+            if (invalidExamples.length < 5) invalidExamples.push(coordsStr);
+            continue; // skip invalid coordinate row
+          }
+
           if (!dMap.has(cleanedImageName)) {
             dMap.set(cleanedImageName, []);
           }
-          dMap.get(cleanedImageName).push({ id: sensorId, coords: coords.toString() });
+          dMap.get(cleanedImageName).push({ id: sensorId, displayName: sensorDisplayName, coords: coordsStr });
           annCount++;
         }
+      }
+
+      if (invalidCoordsCount > 0) {
+        alert(`${invalidCoordsCount} rows had invalid coordinates and were skipped. Examples: ${invalidExamples.join(', ')}`);
+        resetApp();
+        setIsProcessing(false);
+        return;
       }
 
       setDataMap(dMap);
@@ -338,6 +375,18 @@ export default function App() {
               />
               <label htmlFor="drawText">Show Labels</label>
             </div>
+            {options.drawText && (
+              <div className="option-group">
+                <label>Label Type</label>
+                <select
+                  value={options.labelType}
+                  onChange={e => setOptions({...options, labelType: e.target.value})}
+                >
+                  <option value="displayName">Sensor Display Name</option>
+                  <option value="sensorId">Sensor Id</option>
+                </select>
+              </div>
+            )}
             <div className="option-group">
               <label>Output DPI</label>
               <select 
