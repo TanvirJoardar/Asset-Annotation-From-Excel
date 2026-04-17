@@ -1,7 +1,11 @@
-import React from 'react';
 import { CheckCircle, FileSpreadsheet, Image as ImageIcon } from 'lucide-react';
+import type { Stats } from '../types';
 
-export default function StatsOverview({ stats }) {
+interface StatsOverviewProps {
+  stats: Stats;
+}
+
+export default function StatsOverview({ stats }: StatsOverviewProps) {
   return (
     <div className="stats-grid">
       <div className="stat-card">

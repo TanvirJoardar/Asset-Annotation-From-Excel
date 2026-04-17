@@ -1,7 +1,14 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import type { Annotation, AppFileHandle, RenderOptions } from '../types';
 
-function PreviewCanvas({ fileHandle, annotations, options }) {
-  const canvasRef = useRef(null);
+interface PreviewCanvasProps {
+  fileHandle?: AppFileHandle;
+  annotations: Annotation[];
+  options: RenderOptions;
+}
+
+function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -18,6 +25,10 @@ function PreviewCanvas({ fileHandle, annotations, options }) {
 
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        bmp.close();
+        return;
+      }
 
       canvas.width = bmp.width;
       canvas.height = bmp.height;
@@ -45,7 +56,7 @@ function PreviewCanvas({ fileHandle, annotations, options }) {
       bmp.close();
     };
 
-    renderPreview();
+    void renderPreview();
     return () => {
       active = false;
     };
@@ -62,4 +73,4 @@ function PreviewCanvas({ fileHandle, annotations, options }) {
   return <canvas ref={canvasRef} style={{ display: 'block' }} />;
 }
 
-export default React.memo(PreviewCanvas);
+export default PreviewCanvas;

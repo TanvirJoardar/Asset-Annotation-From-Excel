@@ -1,14 +1,36 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { Dispatch, RefObject, SetStateAction } from 'react';
 import PreviewCanvas from './PreviewCanvas';
+import type { Annotation, AppFileHandle, RenderOptions } from '../types';
 
-export default function ModalPreview({ selectedPreview, setSelectedPreview, imageHandles, dataMap, options, modalZoom, setModalZoom, modalContentRef }) {
-  const scrollRef = useRef(null);
+interface ModalPreviewProps {
+  selectedPreview: string | null;
+  setSelectedPreview: (name: string | null) => void;
+  imageHandles: Map<string, AppFileHandle>;
+  dataMap: Map<string, Annotation[]>;
+  options: RenderOptions;
+  modalZoom: number;
+  setModalZoom: Dispatch<SetStateAction<number>>;
+  modalContentRef: RefObject<HTMLDivElement | null>;
+}
+
+export default function ModalPreview({
+  selectedPreview,
+  setSelectedPreview,
+  imageHandles,
+  dataMap,
+  options,
+  modalZoom,
+  setModalZoom,
+  modalContentRef
+}: ModalPreviewProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const isPanningRef = useRef(false);
-  const startRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0, pointerId: null });
+  const startRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0, pointerId: -1 });
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setSelectedPreview(null);
     };
 
@@ -41,14 +63,14 @@ export default function ModalPreview({ selectedPreview, setSelectedPreview, imag
       }
     };
 
-    loadImageSize();
+    void loadImageSize();
   }, [selectedPreview, imageHandles, modalContentRef, setModalZoom]);
 
   if (!selectedPreview) return null;
 
   const handle = imageHandles.get(selectedPreview);
 
-  const onPointerDown = (e) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!scrollRef.current) return;
     isPanningRef.current = true;
     startRef.current = {
@@ -58,10 +80,10 @@ export default function ModalPreview({ selectedPreview, setSelectedPreview, imag
       scrollTop: scrollRef.current.scrollTop,
       pointerId: e.pointerId
     };
-    e.target.setPointerCapture(e.pointerId);
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
-  const onPointerMove = (e) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isPanningRef.current || !scrollRef.current) return;
     const dx = e.clientX - startRef.current.x;
     const dy = e.clientY - startRef.current.y;
@@ -69,11 +91,11 @@ export default function ModalPreview({ selectedPreview, setSelectedPreview, imag
     scrollRef.current.scrollTop = startRef.current.scrollTop - dy;
   };
 
-  const onPointerUp = (e) => {
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isPanningRef.current) return;
     isPanningRef.current = false;
     try {
-      e.target.releasePointerCapture(e.pointerId);
+      e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
       // Ignore release errors if pointer was already released.
     }
@@ -186,7 +208,7 @@ export default function ModalPreview({ selectedPreview, setSelectedPreview, imag
               willChange: 'transform'
             }}
           >
-            <PreviewCanvas fileHandle={handle} annotations={dataMap.get(selectedPreview)} options={options} />
+            <PreviewCanvas fileHandle={handle} annotations={dataMap.get(selectedPreview) ?? []} options={options} />
           </div>
         </div>
       </div>

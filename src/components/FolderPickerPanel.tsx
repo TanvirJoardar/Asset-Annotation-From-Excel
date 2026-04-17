@@ -1,7 +1,10 @@
-import React from 'react';
 import { FolderOpen, UploadCloud } from 'lucide-react';
 
-export default function FolderPickerPanel({ onSelectFolder }) {
+interface FolderPickerPanelProps {
+  onSelectFolder: () => void | Promise<void>;
+}
+
+export default function FolderPickerPanel({ onSelectFolder }: FolderPickerPanelProps) {
   return (
     <div className="glass-panel text-center">
       <div className="dropzone" onClick={onSelectFolder}>
@@ -14,7 +17,7 @@ export default function FolderPickerPanel({ onSelectFolder }) {
             Choose the folder containing both your Excel data and the unannotated images.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); onSelectFolder(); }}>
+        <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); void onSelectFolder(); }}>
           <UploadCloud size={20} /> Browse Folder
         </button>
       </div>

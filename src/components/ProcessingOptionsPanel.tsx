@@ -1,7 +1,15 @@
-import React from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { Loader2, Play } from 'lucide-react';
+import type { RenderOptions } from '../types';
 
-export default function ProcessingOptionsPanel({ options, setOptions, isProcessing, onStart }) {
+interface ProcessingOptionsPanelProps {
+  options: RenderOptions;
+  setOptions: Dispatch<SetStateAction<RenderOptions>>;
+  isProcessing: boolean;
+  onStart: () => void | Promise<void>;
+}
+
+export default function ProcessingOptionsPanel({ options, setOptions, isProcessing, onStart }: ProcessingOptionsPanelProps) {
   return (
     <div className="glass-panel text-center animate-fade-in">
       <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Configure Your Processing Settings</h2>
@@ -43,7 +51,7 @@ export default function ProcessingOptionsPanel({ options, setOptions, isProcessi
             <label>Label Type</label>
             <select
               value={options.labelType}
-              onChange={(e) => setOptions((prev) => ({ ...prev, labelType: e.target.value }))}
+              onChange={(e) => setOptions((prev) => ({ ...prev, labelType: e.target.value as RenderOptions['labelType'] }))}
             >
               <option value="displayName">Sensor Display Name</option>
               <option value="sensorId">Sensor Id</option>
@@ -67,7 +75,7 @@ export default function ProcessingOptionsPanel({ options, setOptions, isProcessi
 
       <button
         className="btn btn-primary"
-        onClick={onStart}
+        onClick={() => void onStart()}
         disabled={isProcessing}
         style={{ width: '100%', maxWidth: '300px', fontSize: '1.2rem', padding: '1rem' }}
       >
