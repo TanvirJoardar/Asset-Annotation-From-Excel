@@ -7,9 +7,18 @@ interface ProcessingOptionsPanelProps {
   setOptions: Dispatch<SetStateAction<RenderOptions>>;
   isProcessing: boolean;
   onStart: () => void | Promise<void>;
+  deleteFirstRowOnAnnotation: boolean;
+  setDeleteFirstRowOnAnnotation: Dispatch<SetStateAction<boolean>>;
 }
 
-export default function ProcessingOptionsPanel({ options, setOptions, isProcessing, onStart }: ProcessingOptionsPanelProps) {
+export default function ProcessingOptionsPanel({
+  options,
+  setOptions,
+  isProcessing,
+  onStart,
+  deleteFirstRowOnAnnotation,
+  setDeleteFirstRowOnAnnotation
+}: ProcessingOptionsPanelProps) {
   return (
     <div className="glass-panel text-center animate-fade-in">
       <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Configure Your Processing Settings</h2>
@@ -70,6 +79,16 @@ export default function ProcessingOptionsPanel({ options, setOptions, isProcessi
             <option value={300}>300 DPI (Print/High Res)</option>
             <option value={600}>600 DPI</option>
           </select>
+        </div>
+
+        <div className="option-group checkbox-group">
+          <input
+            type="checkbox"
+            id="deleteFirstRowOnAnnotation"
+            checked={deleteFirstRowOnAnnotation}
+            onChange={(e) => setDeleteFirstRowOnAnnotation(e.target.checked)}
+          />
+          <label htmlFor="deleteFirstRowOnAnnotation">Remove first row before annotation</label>
         </div>
       </div>
 

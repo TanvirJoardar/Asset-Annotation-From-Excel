@@ -195,6 +195,7 @@ export default function App() {
   const [processedWorkbookBlob, setProcessedWorkbookBlob] = useState<Blob | null>(null);
   const [processedWorkbookName, setProcessedWorkbookName] = useState('Processed_Location_Data.xlsx');
   const [deleteFirstRow, setDeleteFirstRow] = useState(true);
+  const [deleteFirstRowOnAnnotation, setDeleteFirstRowOnAnnotation] = useState(false);
   const [processingSummary, setProcessingSummary] = useState<ProcessingSummary>({
     totalRows: 0,
     missingBlock: 0,
@@ -231,6 +232,7 @@ export default function App() {
     setProcessedWorkbookBlob(null);
     setProcessedWorkbookName('Processed_Location_Data.xlsx');
     setDeleteFirstRow(true);
+    setDeleteFirstRowOnAnnotation(false);
     setProcessingSummary({
       totalRows: 0,
       missingBlock: 0,
@@ -261,6 +263,7 @@ export default function App() {
       setProcessedWorkbookBlob(null);
       setProcessedWorkbookName('Processed_Location_Data.xlsx');
       setDeleteFirstRow(true);
+      setDeleteFirstRowOnAnnotation(false);
       setProcessingSummary({
         totalRows: 0,
         missingBlock: 0,
@@ -456,7 +459,14 @@ export default function App() {
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      const jsonRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as unknown[][];
+      const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as unknown[][];
+      const jsonRaw = deleteFirstRowOnAnnotation ? rawRows.slice(1) : rawRows;
+
+      if (jsonRaw.length === 0) {
+        alert('No data rows available after applying row deletion option for annotation.');
+        setIsProcessing(false);
+        return;
+      }
 
       const headerRowIndex = findHeaderRow(jsonRaw);
       const headers = jsonRaw[headerRowIndex] || [];
@@ -551,7 +561,7 @@ export default function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [allImageHandlesByName, directoryHandle, excelHandle]);
+  }, [allImageHandlesByName, deleteFirstRowOnAnnotation, directoryHandle, excelHandle]);
 
   const exportZip = useCallback(async () => {
     if (dataMap.size === 0) return;
@@ -696,6 +706,8 @@ export default function App() {
             setOptions={setOptions}
             isProcessing={isProcessing}
             onStart={startProcessing}
+            deleteFirstRowOnAnnotation={deleteFirstRowOnAnnotation}
+            setDeleteFirstRowOnAnnotation={setDeleteFirstRowOnAnnotation}
           />
         </>
       )}

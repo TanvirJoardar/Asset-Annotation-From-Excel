@@ -95,3 +95,10 @@ Note:
   - `Missing (count)` when present
   - `Blank (count)` when present
 - Counts are shown next to each tag for each block entry.
+
+### Additional Update (Annotation Start Row Deletion Control)
+- Added checkbox in annotation settings UI:
+  - `Remove first row before annotation`
+- Default state is unchecked.
+- Annotation start now removes first row only when this checkbox is checked.
+- This gives user control instead of always removing first row in annotation flow.
