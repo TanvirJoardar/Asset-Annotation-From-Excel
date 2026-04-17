@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { UploadCloud, FolderOpen, Download, Image as ImageIcon, CheckCircle, FileSpreadsheet, Loader2, Settings2, Play, RefreshCw } from 'lucide-react';
 import { changeDpiDataUrl } from 'dpi-tools';
+import FolderPickerPanel from './components/FolderPickerPanel';
+import ProcessingOptionsPanel from './components/ProcessingOptionsPanel';
+import StatsOverview from './components/StatsOverview';
+import PreviewGridPanel from './components/PreviewGridPanel';
+import ModalPreview from './components/ModalPreview';
 import './App.css';
 
 // Offscreen canvas logic for rendering the circle directly onto the image
@@ -20,15 +24,9 @@ const drawCirclesOnImage = async (fileHandle, annotations, options) => {
   ctx.drawImage(bmp, 0, 0);
 
   // Draw circles
-  annotations.forEach(ann => {
-    let rawX, rawY;
-    if (ann.coords.includes(' ')) {
-      [rawX, rawY] = ann.coords.split(' ').map(Number);
-    } else if (ann.coords.includes(',')) {
-      [rawX, rawY] = ann.coords.split(',').map(Number);
-    } else {
-      [rawX, rawY] = [0, 0];
-    }
+  annotations.forEach((ann) => {
+    const rawX = Number.isFinite(ann.x) ? ann.x : 0;
+    const rawY = Number.isFinite(ann.y) ? ann.y : 0;
 
     ctx.beginPath();
     ctx.arc(rawX, rawY, options.radius, 0, Math.PI * 2);
@@ -54,7 +52,7 @@ const drawCirclesOnImage = async (fileHandle, annotations, options) => {
       if (options.dpi && options.dpi !== 72) {
         finalUrl = changeDpiDataUrl(dataUrl, options.dpi);
       }
-    } catch(e) {
+    } catch (e) {
       console.warn("Failed to apply DPI metadata:", e);
     }
     
@@ -63,63 +61,6 @@ const drawCirclesOnImage = async (fileHandle, annotations, options) => {
       .then(res => res.blob())
       .then(blob => resolve(blob));
   });
-};
-
-function PreviewCanvas({ fileHandle, annotations, options }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    let active = true;
-      const renderPreview = async () => {
-      if (!fileHandle || !canvasRef.current) return;
-      const file = await fileHandle.getFile();
-      const bmp = await createImageBitmap(file);
-
-      if (!active) return;
-
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      
-      // Set canvas to image dimensions
-      canvas.width = bmp.width;
-      canvas.height = bmp.height;
-
-      ctx.drawImage(bmp, 0, 0);
-
-      annotations.forEach(ann => {
-        let rawX, rawY;
-        if (ann.coords.includes(' ')) {
-          [rawX, rawY] = ann.coords.split(' ').map(Number);
-        } else if (ann.coords.includes(',')) {
-          [rawX, rawY] = ann.coords.split(',').map(Number);
-        } else {
-          [rawX, rawY] = [0, 0];
-        }
-
-        ctx.beginPath();
-        ctx.arc(rawX, rawY, options.radius, 0, Math.PI * 2);
-        ctx.fillStyle = options.color;
-        ctx.fill();
-
-        if (options.drawText) {
-          const labelText = options.labelType === 'displayName'
-            ? (ann.displayName || ann.id || '')
-            : (ann.id || ann.displayName || '');
-          ctx.font = `bold ${options.radius}px Arial`;
-          ctx.fillStyle = options.color;
-          ctx.fillText(labelText, rawX + options.radius + 5, rawY + 5);
-        }
-      });
-    };
-    renderPreview();
-    return () => { active = false; };
-  }, [fileHandle, annotations, options]);
-
-  if (!fileHandle) {
-    return <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Missing</div>;
-  }
-
-  return <canvas ref={canvasRef} style={{ display: 'block' }} />;
 }
 
 export default function App() {
@@ -139,18 +80,18 @@ export default function App() {
     labelType: 'displayName' // 'displayName' or 'sensorId'
   });
 
-  const resetApp = () => {
+  const resetApp = useCallback(() => {
     setDirectoryHandle(null);
     setIsProcessed(false);
     setDataMap(new Map());
     setImageHandles(new Map());
     setStats({ excelFiles: 0, annotationsFound: 0, distinctImages: 0 });
-  };
+  }, []);
   const [selectedPreview, setSelectedPreview] = useState(null);
   const [modalZoom, setModalZoom] = useState(1);
   const modalContentRef = useRef(null);
 
-  const selectFolder = async () => {
+  const selectFolder = useCallback(async () => {
     try {
       if (!window.showDirectoryPicker) {
         alert("Your browser does not support the File System Access API. Please use Chrome or Edge.");
@@ -164,9 +105,9 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, []);
 
-  const startProcessing = async () => {
+  const startProcessing = useCallback(async () => {
     if (!directoryHandle) return;
     setIsProcessing(true);
 
@@ -251,17 +192,19 @@ export default function App() {
           const cleanedImageName = imageName.toString().trim();
 
           // Validate coordinates: must be two numbers separated by a space (e.g. "123 456" or "12.3 -45.6")
-          const coordRegex = /^\s*-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?\s*$/;
+          const coordRegex = /^\s*-?\d+(?:\.\d+)?(?:\s+|,\s*)-?\d+(?:\.\d+)?\s*$/;
           if (!coordRegex.test(coordsStr)) {
             invalidCoordsCount++;
             if (invalidExamples.length < 5) invalidExamples.push(coordsStr);
             continue; // skip invalid coordinate row
           }
 
+          const [x, y] = coordsStr.trim().replace(',', ' ').split(/\s+/).map(Number);
+
           if (!dMap.has(cleanedImageName)) {
             dMap.set(cleanedImageName, []);
           }
-          dMap.get(cleanedImageName).push({ id: sensorId, displayName: sensorDisplayName, coords: coordsStr });
+          dMap.get(cleanedImageName).push({ id: sensorId, displayName: sensorDisplayName, x, y });
           annCount++;
         }
       }
@@ -295,9 +238,9 @@ export default function App() {
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [directoryHandle, resetApp]);
 
-  const exportZip = async () => {
+  const exportZip = useCallback(async () => {
     if (dataMap.size === 0) return;
     setIsExporting(true);
 
@@ -322,7 +265,7 @@ export default function App() {
     } finally {
       setIsExporting(false);
     }
-  };
+  }, [dataMap, imageHandles, options]);
 
   return (
     <div className="app-container animate-fade-in">
@@ -332,176 +275,35 @@ export default function App() {
       </header>
 
       {!directoryHandle && (
-        <div className="glass-panel text-center">
-          <div className="dropzone" onClick={selectFolder}>
-            <div className="icon-container">
-              <FolderOpen size={40} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', fontWeight: 600 }}>Select Working Folder</h2>
-              <p style={{ color: 'var(--text-secondary)' }}>Choose the folder containing both your Excel data and the unannotated images.</p>
-            </div>
-            <button className="btn btn-primary" onClick={(e) => { e.stopPropagation(); selectFolder(); }}>
-              <UploadCloud size={20} /> Browse Folder
-            </button>
-          </div>
-        </div>
+        <FolderPickerPanel onSelectFolder={selectFolder} />
       )}
 
       {directoryHandle && !isProcessed && (
-        <div className="glass-panel text-center animate-fade-in">
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Configure Your Processing Settings</h2>
-          
-          <div className="options-panel animate-fade-in" style={{ justifyContent: 'center', marginBottom: '2rem' }}>
-            <div className="option-group">
-              <label>Fill Color</label>
-              <input 
-                type="color" 
-                value={options.color} 
-                onChange={e => setOptions({...options, color: e.target.value})}
-              />
-            </div>
-            <div className="option-group">
-              <label>Radius (px)</label>
-              <input 
-                type="range" 
-                min="5" max="100" 
-                value={options.radius} 
-                onChange={e => setOptions({...options, radius: parseInt(e.target.value)})}
-              />
-              <span>{options.radius}px</span>
-            </div>
-            <div className="option-group checkbox-group">
-              <input 
-                type="checkbox" 
-                id="drawText"
-                checked={options.drawText} 
-                onChange={e => setOptions({...options, drawText: e.target.checked})}
-              />
-              <label htmlFor="drawText">Show Labels</label>
-            </div>
-            {options.drawText && (
-              <div className="option-group">
-                <label>Label Type</label>
-                <select
-                  value={options.labelType}
-                  onChange={e => setOptions({...options, labelType: e.target.value})}
-                >
-                  <option value="displayName">Sensor Display Name</option>
-                  <option value="sensorId">Sensor Id</option>
-                </select>
-              </div>
-            )}
-            
-            <div className="option-group">
-              <label>Output DPI</label>
-              <select 
-                value={options.dpi} 
-                onChange={e => setOptions({...options, dpi: parseInt(e.target.value)})}
-              >
-                <option value={72}>72 DPI (Standard Web)</option>
-                <option value={150}>150 DPI</option>
-                <option value={300}>300 DPI (Print/High Res)</option>
-                <option value={600}>600 DPI</option>
-              </select>
-            </div>
-          </div>
-
-          <button 
-            className="btn btn-primary" 
-            onClick={startProcessing} 
-            disabled={isProcessing}
-            style={{ width: '100%', maxWidth: '300px', fontSize: '1.2rem', padding: '1rem' }}
-          >
-            {isProcessing ? <Loader2 size={24} className="animate-spin" /> : <Play size={24} />}
-            {isProcessing ? 'Processing...' : 'Start Annotation'}
-          </button>
-        </div>
+        <ProcessingOptionsPanel
+          options={options}
+          setOptions={setOptions}
+          isProcessing={isProcessing}
+          onStart={startProcessing}
+        />
       )}
 
       {directoryHandle && isProcessed && (
         <>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <span className="stat-label">Source Spreadsheet</span>
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="text-emerald-400" />
-                <span className="stat-value">{stats.excelFiles > 0 ? "Loaded" : "Missing"}</span>
-              </div>
-            </div>
-            <div className="stat-card">
-              <span className="stat-label">Images Referenced</span>
-              <div className="flex items-center gap-2">
-                <ImageIcon className="text-fuchsia-400" />
-                <span className="stat-value">{stats.distinctImages}</span>
-              </div>
-            </div>
-            <div className="stat-card">
-              <span className="stat-label">Total Annotations</span>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="text-violet-400" />
-                <span className="stat-value">{stats.annotationsFound}</span>
-              </div>
-            </div>
-          </div>
+          <StatsOverview stats={stats} />
 
-          <div className="glass-panel animate-fade-in" style={{ animationDelay: '0.1s' }}>
-            <div className="preview-header">
-              <h2 style={{ fontSize: '1.5rem' }}>Match Preview</h2>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                <button 
-                  className="btn btn-secondary"
-                  onClick={resetApp}
-                >
-                  <RefreshCw size={20} /> New Location
-                </button>
-                <button 
-                  className="btn btn-secondary"
-                  onClick={() => setIsProcessed(false)}
-                >
-                  <Settings2 size={20} /> Edit Options
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={exportZip}
-                  disabled={isExporting || dataMap.size === 0}
-                >
-                  {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
-                  {isExporting ? 'Packaging...' : 'Export Annotated ZIP'}
-                </button>
-              </div>
-            </div>
-
-            <div className="preview-grid mt-4">
-              {Array.from(dataMap.entries()).map(([imgName, annotations]) => {
-                const handle = imageHandles.get(imgName);
-                const isMissing = !handle;
-                return (
-                  <div
-                    key={imgName}
-                    className={`preview-card ${isMissing ? 'missing' : ''}`}
-                    onClick={() => { if (!isMissing) setSelectedPreview(imgName); }}
-                    style={{ cursor: isMissing ? 'default' : 'pointer' }}
-                  >
-                    <div className="preview-image-container">
-                      <PreviewCanvas fileHandle={handle} annotations={annotations} options={options} />
-                    </div>
-                    <div className="preview-footer">
-                      <span className="preview-title" title={imgName}>{imgName}</span>
-                      <span className={`preview-badge ${isMissing ? 'missing' : ''}`}>
-                        {annotations.length} pts
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-          </div>
+          <PreviewGridPanel
+            dataMap={dataMap}
+            imageHandles={imageHandles}
+            options={options}
+            onReset={resetApp}
+            onEditOptions={() => setIsProcessed(false)}
+            onExport={exportZip}
+            isExporting={isExporting}
+            onOpenPreview={setSelectedPreview}
+          />
         </>
       )}
 
-      {/* Modal rendered at top-level of app container so it overlays correctly */}
       <ModalPreview
         selectedPreview={selectedPreview}
         setSelectedPreview={setSelectedPreview}
@@ -512,198 +314,6 @@ export default function App() {
         setModalZoom={setModalZoom}
         modalContentRef={modalContentRef}
       />
-
     </div>
   );
 }
-
-// Render modal at root of component so it overlays correctly
-function ModalPreview({ selectedPreview, setSelectedPreview, imageHandles, dataMap, options, modalZoom, setModalZoom, modalContentRef }) {
-  const scrollRef = useRef(null);
-  const isPanningRef = useRef(false);
-  const startRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0, pointerId: null });
-  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Escape') setSelectedPreview(null);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [setSelectedPreview]);
-
-  // Load image size when preview changes and calculate initial fit zoom
-  useEffect(() => {
-    if (!selectedPreview) return;
-    const loadImageSize = async () => {
-      const handle = imageHandles.get(selectedPreview);
-      if (!handle || !modalContentRef.current) return;
-      try {
-        const file = await handle.getFile();
-        const bmp = await createImageBitmap(file);
-        const size = { width: bmp.width, height: bmp.height };
-        setImageSize(size);
-        
-        // Calculate initial fit zoom - how much we need to scale to fit
-        const container = modalContentRef.current;
-        const availW = container.clientWidth - 64; // account for padding
-        const availH = container.clientHeight - 120; // account for controls
-        // Calculate scale factor to fit image in container (can be > 1 if image is smaller)
-        const fitScale = Math.min(availW / size.width, availH / size.height);
-        // Start with fit scale, but cap at 1 (don't upscale small images beyond natural size)
-        const initialZoom = Math.min(1, fitScale);
-        setModalZoom(initialZoom);
-        
-        bmp.close();
-      } catch (e) {
-        console.warn('Failed to load image size:', e);
-        setModalZoom(1);
-      }
-    };
-    loadImageSize();
-  }, [selectedPreview, imageHandles]);
-
-  if (!selectedPreview) return null;
-  const handle = imageHandles.get(selectedPreview);
-
-  const onPointerDown = (e) => {
-    if (!scrollRef.current) return;
-    isPanningRef.current = true;
-    startRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      scrollLeft: scrollRef.current.scrollLeft,
-      scrollTop: scrollRef.current.scrollTop,
-      pointerId: e.pointerId
-    };
-    e.target.setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e) => {
-    if (!isPanningRef.current || !scrollRef.current) return;
-    const dx = e.clientX - startRef.current.x;
-    const dy = e.clientY - startRef.current.y;
-    scrollRef.current.scrollLeft = startRef.current.scrollLeft - dx;
-    scrollRef.current.scrollTop = startRef.current.scrollTop - dy;
-  };
-
-  const onPointerUp = (e) => {
-    if (!isPanningRef.current) return;
-    isPanningRef.current = false;
-    try { e.target.releasePointerCapture(e.pointerId); } catch (err) {}
-  };
-
-  return (
-    <div
-      className="modal-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) setSelectedPreview(null); }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999
-      }}
-    >
-      <div
-        className="modal-content"
-        ref={modalContentRef}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'relative',
-          background: 'var(--surface, #fff)',
-          padding: '16px',
-          borderRadius: '8px',
-          width: '95vw',
-          height: '95vh',
-          overflow: 'hidden',
-          boxSizing: 'border-box',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        {/* Visible floating controls (top-right) */}
-        <div 
-          style={{ position: 'absolute', top: 12, right: 12, zIndex: 10001 }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.55)', padding: '6px', borderRadius: 6 }}>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setModalZoom(z => Math.max(0.1, z / 1.25)); }}
-              style={{ background: 'white', color: '#111', border: 'none', padding: '6px 8px', borderRadius: 4, cursor: 'pointer' }}
-            >-</button>
-            <button
-              type="button"
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                // Calculate fit zoom based on image size vs container size
-                if (imageSize.width > 0 && modalContentRef.current) {
-                  const container = modalContentRef.current;
-                  const availW = container.clientWidth - 64; // account for padding
-                  const availH = container.clientHeight - 120; // account for controls
-                  const fitScale = Math.min(availW / imageSize.width, availH / imageSize.height);
-                  const fitZoom = Math.min(1, fitScale);
-                  setModalZoom(fitZoom);
-                } else {
-                  setModalZoom(1);
-                }
-                // Reset scroll position
-                if (scrollRef.current) {
-                  scrollRef.current.scrollLeft = 0;
-                  scrollRef.current.scrollTop = 0;
-                }
-              }}
-              style={{ background: 'white', color: '#111', border: 'none', padding: '6px 8px', borderRadius: 4, cursor: 'pointer' }}
-            >Fit</button>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setModalZoom(z => Math.min(8, z * 1.25)); }}
-              style={{ background: 'white', color: '#111', border: 'none', padding: '6px 8px', borderRadius: 4, cursor: 'pointer' }}
-            >+</button>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="button" className="btn btn-secondary" onClick={(e) => { e.stopPropagation(); setSelectedPreview(null); }}>Close</button>
-        </div>
-
-        <div
-          ref={scrollRef}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          style={{ 
-            flex: 1, 
-            overflow: modalZoom > 1 ? 'auto' : 'hidden', 
-            position: 'relative', 
-            cursor: isPanningRef.current ? 'grabbing' : (modalZoom > 1 ? 'grab' : 'default'),
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            padding: '20px'
-          }}
-        >
-          <div style={{ 
-            position: 'relative',
-            transformOrigin: 'center center',
-            transform: `scale(${modalZoom})`,
-            transition: 'none', // Remove transition for instant response
-            willChange: 'transform' // Hint for GPU acceleration
-          }}>
-            <PreviewCanvas 
-              fileHandle={handle} 
-              annotations={dataMap.get(selectedPreview)} 
-              options={options}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export { ModalPreview };
