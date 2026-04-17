@@ -33,6 +33,11 @@ const extractLevelToken = (value: unknown): string | null => {
   return match ? match[0].toUpperCase() : null;
 };
 
+const isMissingOrBlank = (value: unknown): boolean => {
+  const normalized = normalize(value).toLowerCase();
+  return normalized === 'missing' || normalized === 'blank';
+};
+
 const parseBlockAndLevel = (locationDescriptor: unknown): { block: string; level: string } => {
   const descriptorText = normalize(locationDescriptor);
   if (!descriptorText) {
@@ -359,20 +364,20 @@ export default function App() {
         row[colLevel] = level;
 
         totalRows++;
-        if (block === 'Missing' || block === 'Blank') missingBlock++;
-        if (level === 'Missing' || level === 'Blank') {
+        if (isMissingOrBlank(block)) missingBlock++;
+        if (isMissingOrBlank(level)) {
           missingLevel++;
           const key = block || 'Missing';
           const current = blocksWithMissingOrBlankLevelMap.get(key) ?? { missingCount: 0, blankCount: 0 };
-          if (level === 'Missing') {
+          if (normalize(level).toLowerCase() === 'missing') {
             current.missingCount += 1;
           }
-          if (level === 'Blank') {
+          if (normalize(level).toLowerCase() === 'blank') {
             current.blankCount += 1;
           }
           blocksWithMissingOrBlankLevelMap.set(key, current);
         }
-        if (block !== 'Missing' && block !== 'Blank' && level !== 'Missing' && level !== 'Blank') validBlockLevel++;
+        if (!isMissingOrBlank(block) && !isMissingOrBlank(level)) validBlockLevel++;
       }
 
       const outputSheet = XLSX.utils.aoa_to_sheet(updatedRows);
