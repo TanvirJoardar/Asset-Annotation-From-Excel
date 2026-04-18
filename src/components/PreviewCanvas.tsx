@@ -35,8 +35,13 @@ function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps)
       ctx.drawImage(bmp, 0, 0);
 
       for (const ann of annotations) {
-        const x = Number.isFinite(ann.x) ? ann.x : 0;
-        const y = Number.isFinite(ann.y) ? ann.y : 0;
+        // Ignore rows with incomplete coordinates so neither marker nor label is rendered.
+        if (!Number.isFinite(ann.x) || !Number.isFinite(ann.y)) {
+          continue;
+        }
+
+        const x = ann.x;
+        const y = ann.y;
 
         ctx.beginPath();
         ctx.arc(x, y, options.radius, 0, Math.PI * 2);

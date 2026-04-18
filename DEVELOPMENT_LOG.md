@@ -4,6 +4,11 @@ This file tracks what has been developed in this project.
 
 ## 2026-04-19
 
+### Additional Update (Skip Incomplete Coordinate Annotations)
+- Fixed preview annotation rendering so rows with only one coordinate value (`x` without `y`, or `y` without `x`) are skipped entirely.
+- Updated `src/components/PreviewCanvas.tsx` draw loop to require both coordinates as finite numbers before rendering.
+- Result: no circle and no label are drawn for incomplete coordinate rows.
+
 ### Additional Update (Single-Level Blocks: Fixed Side-by-Side Cards)
 - Refined preview layout for blocks that resolve to only one level (for example `UnassignedLevel`).
 - Kept the outer level grid behavior unchanged while restoring single-level full-width usage only for that one level.
