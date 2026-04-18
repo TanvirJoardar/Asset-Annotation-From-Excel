@@ -199,9 +199,17 @@ export function useAssetAnnotationWorkflow() {
     missingBlock: 0,
     missingLevel: 0,
     validBlockLevel: 0,
+    coordinateIssues: {
+      blankCount: 0,
+      singleValueCount: 0,
+      totalCount: 0
+    },
+    blockLevelBackgroundImageConflicts: [],
+    hasIssues: false,
     blocksWithMissingOrBlankLevel: []
   });
   const [showLevelIssueBlocks, setShowLevelIssueBlocks] = useState(false);
+  const [showProcessingIssues, setShowProcessingIssues] = useState(false);
   const [isProcessed, setIsProcessed] = useState(false);
   const [dataMap, setDataMap] = useState<Map<string, Annotation[]>>(new Map());
   const [imageHandles, setImageHandles] = useState<Map<string, AppFileHandle>>(new Map());
@@ -231,9 +239,17 @@ export function useAssetAnnotationWorkflow() {
       missingBlock: 0,
       missingLevel: 0,
       validBlockLevel: 0,
+      coordinateIssues: {
+        blankCount: 0,
+        singleValueCount: 0,
+        totalCount: 0
+      },
+      blockLevelBackgroundImageConflicts: [],
+      hasIssues: false,
       blocksWithMissingOrBlankLevel: []
     });
     setShowLevelIssueBlocks(false);
+    setShowProcessingIssues(false);
     setIsProcessed(false);
     setDataMap(new Map());
     setImageHandles(new Map());
@@ -283,6 +299,7 @@ export function useAssetAnnotationWorkflow() {
       setProcessedWorkbookBlob(processed.outputBlob);
       setProcessingSummary(processed.summary);
       setShowLevelIssueBlocks(false);
+      setShowProcessingIssues(false);
       setExcelHandle(excelFileHandle);
       setAllImageFiles(imageFiles);
       setIsFileProcessed(true);
@@ -428,6 +445,10 @@ export function useAssetAnnotationWorkflow() {
     setShowLevelIssueBlocks((prev) => !prev);
   }, []);
 
+  const toggleProcessingIssues = useCallback(() => {
+    setShowProcessingIssues((prev) => !prev);
+  }, []);
+
   return {
     directoryHandle,
     isProcessed,
@@ -440,6 +461,8 @@ export function useAssetAnnotationWorkflow() {
     processingSummary,
     showLevelIssueBlocks,
     toggleLevelIssueBlocks,
+    showProcessingIssues,
+    toggleProcessingIssues,
     options,
     setOptions,
     isProcessing,

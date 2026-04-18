@@ -22,6 +22,8 @@ export default function App() {
     processingSummary,
     showLevelIssueBlocks,
     toggleLevelIssueBlocks,
+    showProcessingIssues,
+    toggleProcessingIssues,
     options,
     setOptions,
     isProcessing,
@@ -59,6 +61,8 @@ export default function App() {
             processingSummary={processingSummary}
             showLevelIssueBlocks={showLevelIssueBlocks}
             onToggleLevelIssueBlocks={toggleLevelIssueBlocks}
+            showProcessingIssues={showProcessingIssues}
+            onToggleProcessingIssues={toggleProcessingIssues}
           />
 
           <ProcessingOptionsPanel

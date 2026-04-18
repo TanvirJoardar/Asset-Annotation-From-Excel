@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import type { Annotation, ProcessingSummary } from '../types';
 
 const normalize = (value: unknown): string => (value ?? '').toString().trim();
@@ -12,6 +12,8 @@ const isMissingOrBlank = (value: unknown): boolean => {
   const normalized = normalize(value).toLowerCase();
   return normalized === 'missing' || normalized === 'blank';
 };
+
+const isNumericValue = (value: string): boolean => /^-?\d+(?:\.\d+)?$/.test(value);
 
 const parseBlockAndLevel = (locationDescriptor: unknown): { block: string; level: string } => {
   const descriptorText = normalize(locationDescriptor);
@@ -131,12 +133,25 @@ export const buildProcessedWorkbook = async (
 
   const colBlock = insertAt;
   const colLevel = insertAt + 1;
+  const colCoordinates = finalHeader.findIndex((h) => normalize(h).toLowerCase() === 'coordinates');
+  const colBackgroundImage = finalHeader.findIndex((h) => {
+    const key = normalize(h).toLowerCase();
+    return key === 'background image name' || key === 'background image';
+  });
 
   let totalRows = 0;
   let missingBlock = 0;
   let missingLevel = 0;
   let validBlockLevel = 0;
+  let coordinateBlankCount = 0;
+  let coordinateSingleValueCount = 0;
   const blocksWithMissingOrBlankLevelMap = new Map<string, { missingCount: number; blankCount: number }>();
+  const blockLevelImageMap = new Map<string, {
+    blockName: string;
+    levelName: string;
+    imageNameMap: Map<string, string>;
+    rowIndexes: number[];
+  }>();
 
   for (let i = headerRowIndex + 1; i < updatedRows.length; i++) {
     const row = updatedRows[i];
@@ -175,9 +190,76 @@ export const buildProcessedWorkbook = async (
     if (!isMissingOrBlank(block) && !isMissingOrBlank(level)) {
       validBlockLevel++;
     }
+
+    if (colCoordinates !== -1) {
+      const coordinatesText = normalize(row[colCoordinates]);
+      if (!coordinatesText) {
+        coordinateBlankCount++;
+      } else {
+        const parts = coordinatesText.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+        if (parts.length === 1 && isNumericValue(parts[0])) {
+          coordinateSingleValueCount++;
+        }
+      }
+    }
+
+    if (colBackgroundImage !== -1) {
+      const imageName = normalize(row[colBackgroundImage]);
+      if (imageName) {
+        const conflictKey = `${block.toLowerCase()}|${level.toLowerCase()}`;
+        const existing = blockLevelImageMap.get(conflictKey) ?? {
+          blockName: block,
+          levelName: level,
+          imageNameMap: new Map<string, string>(),
+          rowIndexes: []
+        };
+
+        const imageKey = imageName.toLowerCase();
+        if (!existing.imageNameMap.has(imageKey)) {
+          existing.imageNameMap.set(imageKey, imageName);
+        }
+        existing.rowIndexes.push(i);
+        blockLevelImageMap.set(conflictKey, existing);
+      }
+    }
   }
 
   const outputSheet = XLSX.utils.aoa_to_sheet(updatedRows);
+
+  const blockLevelBackgroundImageConflicts = Array.from(blockLevelImageMap.values())
+    .filter((entry) => entry.imageNameMap.size > 1)
+    .map((entry) => ({
+      blockName: entry.blockName,
+      levelName: entry.levelName,
+      imageNames: Array.from(entry.imageNameMap.values()).sort((a, b) => a.localeCompare(b)),
+      affectedRows: entry.rowIndexes.length,
+      rowIndexes: entry.rowIndexes
+    }))
+    .sort((a, b) => `${a.blockName}|${a.levelName}`.localeCompare(`${b.blockName}|${b.levelName}`));
+
+  if (colBackgroundImage !== -1) {
+    for (const conflict of blockLevelBackgroundImageConflicts) {
+      for (const rowIndex of conflict.rowIndexes) {
+        const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colBackgroundImage });
+        const cell = outputSheet[cellAddress];
+        if (!cell) {
+          continue;
+        }
+
+        cell.s = {
+          fill: {
+            patternType: 'solid',
+            fgColor: { rgb: 'FFFF4D4F' }
+          },
+          font: {
+            color: { rgb: 'FFFFFFFF' },
+            bold: true
+          }
+        };
+      }
+    }
+  }
+
   const outputWorkbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(outputWorkbook, outputSheet, firstSheetName || 'Sheet1');
 
@@ -196,6 +278,18 @@ export const buildProcessedWorkbook = async (
       missingBlock,
       missingLevel,
       validBlockLevel,
+      coordinateIssues: {
+        blankCount: coordinateBlankCount,
+        singleValueCount: coordinateSingleValueCount,
+        totalCount: coordinateBlankCount + coordinateSingleValueCount
+      },
+      blockLevelBackgroundImageConflicts: blockLevelBackgroundImageConflicts.map((item) => ({
+        blockName: item.blockName,
+        levelName: item.levelName,
+        imageNames: item.imageNames,
+        affectedRows: item.affectedRows
+      })),
+      hasIssues: coordinateBlankCount + coordinateSingleValueCount > 0 || blockLevelBackgroundImageConflicts.length > 0,
       blocksWithMissingOrBlankLevel: Array.from(blocksWithMissingOrBlankLevelMap.entries())
         .map(([blockName, counts]) => ({
           blockName,

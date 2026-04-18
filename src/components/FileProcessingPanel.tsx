@@ -11,6 +11,8 @@ interface FileProcessingPanelProps {
   processingSummary: ProcessingSummary;
   showLevelIssueBlocks: boolean;
   onToggleLevelIssueBlocks: () => void;
+  showProcessingIssues: boolean;
+  onToggleProcessingIssues: () => void;
 }
 
 export default function FileProcessingPanel({
@@ -22,8 +24,13 @@ export default function FileProcessingPanel({
   onDownloadProcessedFile,
   processingSummary,
   showLevelIssueBlocks,
-  onToggleLevelIssueBlocks
+  onToggleLevelIssueBlocks,
+  showProcessingIssues,
+  onToggleProcessingIssues
 }: FileProcessingPanelProps) {
+  const conflictCount = processingSummary.blockLevelBackgroundImageConflicts.length;
+  const issueCount = processingSummary.coordinateIssues.totalCount + conflictCount;
+
   return (
     <div className="glass-panel animate-fade-in" style={{ marginBottom: '1rem' }}>
       <h2 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>File Processing (Optional)</h2>
@@ -41,7 +48,7 @@ export default function FileProcessingPanel({
         <label htmlFor="deleteFirstRow">Delete first row before processing</label>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="btn btn-primary" onClick={() => void onProcessFile()} disabled={isFileProcessing}>
           {isFileProcessing ? 'Processing File...' : (isFileProcessed ? 'Reprocess File' : 'Process Excel File')}
         </button>
@@ -49,6 +56,18 @@ export default function FileProcessingPanel({
         {isFileProcessed && (
           <button className="btn btn-secondary" onClick={onDownloadProcessedFile}>
             Download Processed File
+          </button>
+        )}
+
+        {isFileProcessed && (
+          <button
+            type="button"
+            className={`issue-status-btn ${processingSummary.hasIssues ? 'has-issues' : 'no-issues'}`}
+            onClick={onToggleProcessingIssues}
+            title="Show processing issue details"
+          >
+            <span className="issue-status-dot" aria-hidden="true" />
+            {processingSummary.hasIssues ? `Issues (${issueCount})` : 'No Issues'}
           </button>
         )}
       </div>
@@ -121,6 +140,60 @@ export default function FileProcessingPanel({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {isFileProcessed && showProcessingIssues && (
+        <div className="glass-panel processing-issues-panel" style={{ marginTop: '1rem', padding: '1rem' }}>
+          <div className="issue-panel-header">
+            <h3 style={{ fontSize: '1rem', marginBottom: 0 }}>Processing Issues</h3>
+            <span className="issue-panel-total">{issueCount} total</span>
+          </div>
+
+          <section className="issue-section">
+            <h4 className="issue-section-title">Coordinates Column Issues</h4>
+            <div className="issue-metric-grid">
+              <div className="issue-metric-card blank">
+                <span className="issue-metric-label">Blank Coordinates</span>
+                <span className="issue-metric-value">{processingSummary.coordinateIssues.blankCount}</span>
+              </div>
+              <div className="issue-metric-card partial">
+                <span className="issue-metric-label">Only X or Y</span>
+                <span className="issue-metric-value">{processingSummary.coordinateIssues.singleValueCount}</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="issue-section">
+            <div className="issue-section-title-row">
+              <h4 className="issue-section-title">Block/Level with Multiple Background Image Name Values</h4>
+              <span className="issue-count-capsule">{conflictCount} conflicts</span>
+            </div>
+
+            {processingSummary.blockLevelBackgroundImageConflicts.length === 0 ? (
+              <p className="issue-empty-state">No block-level background image conflicts detected.</p>
+            ) : (
+              <div className="issue-conflict-grid">
+                {processingSummary.blockLevelBackgroundImageConflicts.map((item) => (
+                  <article key={`${item.blockName}|${item.levelName}`} className="issue-conflict-card">
+                    <div className="issue-card-meta-row">
+                      <span className="issue-meta-pill">Block: {item.blockName}</span>
+                      <span className="issue-meta-pill">Level: {item.levelName}</span>
+                      <span className="issue-meta-pill issue-meta-pill-danger">Rows: {item.affectedRows}</span>
+                    </div>
+                    <p className="issue-image-label">Image Names</p>
+                    <div className="issue-image-pills-wrap">
+                      {item.imageNames.map((name) => (
+                        <span key={name} className="issue-image-pill" title={name}>
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       )}
     </div>

@@ -4,6 +4,44 @@ This file tracks what has been developed in this project.
 
 ## 2026-04-19
 
+### Additional Update (Reduced Red Tint in Issues Panel)
+- Tuned Processing Issues visual theme to reduce the heavy red glass background.
+- Switched panel and section backgrounds to neutral dark slate tones.
+- Kept red as a focused accent only for risk indicators:
+  - conflict count capsule
+  - left border on conflict cards
+  - rows danger pill
+- Result: clearer, less fatiguing UI while preserving issue visibility.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Processing Issues UI Polish)
+- Refined the Processing Issues panel visual hierarchy for better readability.
+- Added a clearer section layout with:
+  - Header summary capsule (`total issues`).
+  - Dedicated coordinate issue metric cards.
+  - Dedicated conflict list section with conflict count capsule.
+- Replaced comma-separated image-name text with capsule/chip style items for each image name.
+- Improved conflict cards with stronger metadata tags for Block, Level, and affected Rows.
+- Added responsive adjustments for issue-panel headers and section controls on smaller screens.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Processing Issue Status + Conflict Highlighting)
+- Added a clickable processing issue status indicator in `File Processing (Optional)`.
+  - Green status when no issues are detected.
+  - Issue count appears when problems are found.
+  - Clicking the status opens an issue details panel.
+- Added issue details for `Coordinates` column quality checks:
+  - Count of rows where coordinates are blank.
+  - Count of rows where only one numeric coordinate value exists (only X or only Y).
+- Added block/level conflict detection for `Background Image Name`:
+  - Detects when the same processed `Block + Level` has multiple image names.
+  - Lists all conflicting image names in the issue panel.
+- Updated processed workbook export to mark conflicting `Background Image Name` cells with red fill and white bold text.
+- Validation target for this update:
+  - `npm run typecheck`
+
 ### Additional Update (Skip Incomplete Coordinate Annotations)
 - Fixed preview annotation rendering so rows with only one coordinate value (`x` without `y`, or `y` without `x`) are skipped entirely.
 - Updated `src/components/PreviewCanvas.tsx` draw loop to require both coordinates as finite numbers before rendering.

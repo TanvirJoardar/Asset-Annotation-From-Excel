@@ -35,6 +35,18 @@ export interface ProcessingSummary {
   missingBlock: number;
   missingLevel: number;
   validBlockLevel: number;
+  coordinateIssues: {
+    blankCount: number;
+    singleValueCount: number;
+    totalCount: number;
+  };
+  blockLevelBackgroundImageConflicts: Array<{
+    blockName: string;
+    levelName: string;
+    imageNames: string[];
+    affectedRows: number;
+  }>;
+  hasIssues: boolean;
   blocksWithMissingOrBlankLevel: Array<{
     blockName: string;
     missingCount: number;
