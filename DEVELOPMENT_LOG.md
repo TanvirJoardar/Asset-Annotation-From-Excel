@@ -2,6 +2,32 @@
 
 This file tracks what has been developed in this project.
 
+## 2026-04-19
+
+### Additional Update (App.tsx Readability Refactor)
+- Extracted page header markup from `src/App.tsx` into `src/components/AppHeader.tsx`.
+- Extracted optional file-processing UI block from `src/App.tsx` into `src/components/FileProcessingPanel.tsx`.
+- Kept existing behavior and state flow intact while reducing JSX size and improving top-level readability in `src/App.tsx`.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (App.tsx Readability Refactor - Utility Extraction)
+- Extracted recursive folder discovery logic from `src/App.tsx` to `src/utils/fileDiscovery.ts`.
+- Extracted workbook parsing/transformation logic to `src/utils/workbookProcessing.ts`:
+  - Processed workbook generation for `Processed Block` and `Processed Level`.
+  - Annotation map extraction and invalid coordinate reporting.
+- Refactored repeated state-reset logic in `src/App.tsx` into a shared callback used by both app reset and folder selection.
+- Kept runtime behavior intact while reducing orchestration complexity in `src/App.tsx`.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (App.tsx Readability Refactor - Workflow Hook Extraction)
+- Extracted app workflow state and actions from `src/App.tsx` into `src/hooks/useAssetAnnotationWorkflow.ts`.
+- Moved processing, annotation start, ZIP export, reset, and folder selection handlers into the hook while preserving behavior.
+- Reduced `src/App.tsx` to mostly UI composition and modal-local state, improving scanability.
+- Validation status:
+  - `npm run typecheck` passes
+
 ## 2026-04-17
 
 ### Implemented
