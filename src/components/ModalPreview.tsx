@@ -255,19 +255,19 @@ export default function ModalPreview({
             overflow: modalZoom > 1 ? 'auto' : 'hidden',
             position: 'relative',
             cursor: isPanningRef.current ? 'grabbing' : (modalZoom > 1 ? 'grab' : 'default'),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             padding: '20px'
           }}
         >
           <div
             style={{
               position: 'relative',
-              transformOrigin: 'center center',
+              transformOrigin: 'top left',
               transform: `scale(${modalZoom})`,
               transition: 'none',
-              willChange: 'transform'
+              willChange: 'transform',
+              width: imageSize.width > 0 ? imageSize.width : 'auto',
+              height: imageSize.height > 0 ? imageSize.height : 'auto',
+              margin: modalZoom <= 1 ? 'auto' : 0
             }}
           >
             <PreviewCanvas fileHandle={selectedHandle} annotations={selectedAnnotations} options={options} />
