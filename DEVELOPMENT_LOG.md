@@ -4,6 +4,85 @@ This file tracks what has been developed in this project.
 
 ## 2026-04-19
 
+### Additional Update (Single-Level Blocks: Fixed Side-by-Side Cards)
+- Refined preview layout for blocks that resolve to only one level (for example `UnassignedLevel`).
+- Kept the outer level grid behavior unchanged while restoring single-level full-width usage only for that one level.
+- Within the single-level group, cards now render in a fixed 5-column row so they stay compact and appear side-by-side instead of stacking vertically.
+- Validation status:
+  - `npm run typecheck` passes
+  - `npm run build` passes
+
+### Additional Update (Always 5 Levels Per Row)
+- Adjusted preview level layout to consistently render 5 level columns per row.
+- Removed single-level full-width expansion rule that caused oversized cards when only one level existed.
+- Removed responsive overrides that changed level column count, keeping the requested fixed 5-column grid behavior.
+- Validation status:
+  - `npm run typecheck` passes
+  - `npm run build` passes
+
+### Additional Update (Single-Level Block Side-by-Side Cards)
+- Fixed preview layout for blocks that have only one resolved level (for example `Unassigned Level`).
+- When a block has a single level, that level column now spans the full preview width.
+- Images inside that single level now flow side-by-side using an auto-fit grid instead of stacking in one narrow vertical column.
+- Validation status:
+  - `npm run typecheck` passes
+  - `npm run build` passes
+
+### Additional Update (Blank Block Regression Fix)
+- Fixed a regression where many images were grouped under `Blank/Blank` instead of showing side-by-side under meaningful block/level values.
+- Added fallback block/level resolution in `src/hooks/useAssetAnnotationWorkflow.ts`:
+  - Primary source: processed block/level values from workbook grouping.
+  - Fallback 1: matched image path segments (block and level folders).
+  - Fallback 2: image name parsing (`L##`/`B##` for level and first token for block).
+  - Final fallback labels: `Unassigned Block` / `Unassigned Level`.
+- This prevents unexpected movement into the `Blank` tab when usable context exists and restores side-by-side level grouping consistency.
+- Validation status:
+  - `npm run typecheck` passes
+  - `npm run build` passes
+
+### Additional Update (Processed Level Labeling + Consistent Side-by-Side Levels)
+- Fixed preview grouping source so level names come from processed annotation data (`Processed Level`) instead of depending on discovered image folder depth.
+- Updated preview key generation in `src/hooks/useAssetAnnotationWorkflow.ts` to always build paths as:
+  - `Processed Block/Processed Level/ImageName.png`
+- This removes incorrect `root` level labels and ensures blocks like `C1 Carpark and Outdoor` use consistent side-by-side level columns when levels differ.
+- Added path-part sanitization to avoid malformed keys when block/level text contains path separators.
+- Validation status:
+  - `npm run typecheck` passes
+  - `npm run build` passes
+
+### Additional Update (Compact Cards + 5 Levels Per Row)
+- Updated level layout in preview to a wrapped grid with 5 level columns per row on desktop.
+- Levels now continue to next row automatically (row 2: next 5 levels, then row 3, etc.).
+- Reduced card visual size in level view for denser layout:
+  - Smaller image aspect area.
+  - Tighter card footer/title spacing.
+- Added responsive breakpoints to reduce columns on smaller screens for usability.
+- Validation status:
+  - `npm run typecheck` passes
+  - `npm run build` passes
+
+### Additional Update (Level Columns in Preview)
+- Updated selected block preview layout so levels render side-by-side horizontally instead of stacking vertically.
+- Each level now appears as its own column with its images grouped under that level title.
+- Preserved existing block tabs and click-to-open modal behavior.
+- Updated styles in `src/App.css` for level-column scrolling and responsive sizing.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Preview Tabs by Block + Row-wise Floor Images + Modal Fix)
+- Updated preview organization in `src/components/PreviewGridPanel.tsx`:
+  - Added block-level tabs.
+  - Each selected block now shows floor groups as row-wise horizontal image lists.
+  - Kept click behavior on each image card to open modal preview.
+- Updated preview styles in `src/App.css` to support block tab buttons and row-wise floor image layout.
+- Fixed modal preview regression in `src/components/ModalPreview.tsx`:
+  - Added robust path matching for selected preview keys (exact, normalized, and filename fallback) to prevent missing-handle blank renders.
+  - Hardened fit-zoom calculation with safe clamping to avoid invalid/near-zero scale values that could make content appear invisible.
+  - Kept existing modal visual design and controls unchanged.
+- Improved missing-image placeholder visibility in `src/components/PreviewCanvas.tsx`.
+- Validation status:
+  - `npm run typecheck` passes
+
 ### Additional Update (App.tsx Readability Refactor)
 - Extracted page header markup from `src/App.tsx` into `src/components/AppHeader.tsx`.
 - Extracted optional file-processing UI block from `src/App.tsx` into `src/components/FileProcessingPanel.tsx`.
@@ -25,6 +104,18 @@ This file tracks what has been developed in this project.
 - Extracted app workflow state and actions from `src/App.tsx` into `src/hooks/useAssetAnnotationWorkflow.ts`.
 - Moved processing, annotation start, ZIP export, reset, and folder selection handlers into the hook while preserving behavior.
 - Reduced `src/App.tsx` to mostly UI composition and modal-local state, improving scanability.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Block/Level Directory Mapping + Structured Preview/ZIP)
+- Updated annotation extraction to group rows by `Processed Block`, `Processed Level`, and `Background Image Name` (with fallback to parsed descriptor/legacy columns).
+- Added case-insensitive block-folder matching during image resolution:
+  - Find matching image name within the folder path that contains the processed block name.
+  - Prefer paths that also include the processed level name when multiple matches exist.
+- Updated preview data keys to use relative image paths (folder structure) instead of filename-only keys.
+- Updated preview UI to group cards by folder path so results reflect directory structure.
+- Updated ZIP export to preserve the same folder structure as preview/directory paths.
+- Added richer file discovery metadata (`path`, normalized segments) to support robust matching.
 - Validation status:
   - `npm run typecheck` passes
 

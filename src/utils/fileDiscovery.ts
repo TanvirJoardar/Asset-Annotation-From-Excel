@@ -1,4 +1,4 @@
-import type { AppDirectoryHandle, AppFileHandle } from '../types';
+import type { AppDirectoryHandle, AppFileHandle, DiscoveredImageFile } from '../types';
 
 const EXCEL_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
 
@@ -31,22 +31,41 @@ const collectFilesRecursively = async (
 
 export const collectExcelAndImageHandles = async (
   dirHandle: AppDirectoryHandle
-): Promise<{ excelFileHandle: AppFileHandle | null; imageMap: Map<string, AppFileHandle> }> => {
+): Promise<{
+  excelFileHandle: AppFileHandle | null;
+  imageMap: Map<string, AppFileHandle>;
+  imageFiles: DiscoveredImageFile[];
+}> => {
   const allFiles = await collectFilesRecursively(dirHandle);
   const excelFileEntry = allFiles.find((item) => isExcelFileName(item.handle.name));
 
   const imageMap = new Map<string, AppFileHandle>();
+  const imageFiles: DiscoveredImageFile[] = [];
+
   for (const fileEntry of allFiles) {
     if (isExcelFileName(fileEntry.handle.name)) {
       continue;
     }
+
     if (!imageMap.has(fileEntry.handle.name)) {
       imageMap.set(fileEntry.handle.name, fileEntry.handle);
     }
+
+    const path = fileEntry.path;
+    const pathLower = path.toLowerCase();
+    imageFiles.push({
+      handle: fileEntry.handle,
+      path,
+      pathLower,
+      fileName: fileEntry.handle.name,
+      fileNameLower: fileEntry.handle.name.toLowerCase(),
+      segmentsLower: pathLower.split('/').filter(Boolean)
+    });
   }
 
   return {
     excelFileHandle: excelFileEntry?.handle ?? null,
-    imageMap
+    imageMap,
+    imageFiles
   };
 };

@@ -64,7 +64,17 @@ function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps)
 
   if (!fileHandle) {
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--text-secondary)',
+          fontWeight: 500
+        }}
+      >
         Missing
       </div>
     );

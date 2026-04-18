@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import PreviewCanvas from './PreviewCanvas';
 import type { Annotation, AppFileHandle, RenderOptions } from '../types';
 
@@ -11,8 +11,52 @@ interface ModalPreviewProps {
   options: RenderOptions;
   modalZoom: number;
   setModalZoom: Dispatch<SetStateAction<number>>;
-  modalContentRef: RefObject<HTMLDivElement | null>;
 }
+
+const normalizePath = (path: string): string => path.replace(/\\/g, '/').toLowerCase();
+
+const getFileName = (path: string): string => {
+  const parts = path.replace(/\\/g, '/').split('/').filter(Boolean);
+  return parts[parts.length - 1] ?? path;
+};
+
+const findMatchingPath = <T,>(targetPath: string, source: Map<string, T>): string | null => {
+  if (source.has(targetPath)) {
+    return targetPath;
+  }
+
+  const targetNormalized = normalizePath(targetPath);
+  for (const key of source.keys()) {
+    if (normalizePath(key) === targetNormalized) {
+      return key;
+    }
+  }
+
+  const targetFileName = getFileName(targetPath).toLowerCase();
+  for (const key of source.keys()) {
+    if (getFileName(key).toLowerCase() === targetFileName) {
+      return key;
+    }
+  }
+
+  return null;
+};
+
+const getFitScale = (container: HTMLDivElement, width: number, height: number): number => {
+  if (width <= 0 || height <= 0) {
+    return 1;
+  }
+
+  const availW = Math.max(1, container.clientWidth - 64);
+  const availH = Math.max(1, container.clientHeight - 120);
+  const fitScale = Math.min(availW / width, availH / height);
+
+  if (!Number.isFinite(fitScale) || fitScale <= 0) {
+    return 1;
+  }
+
+  return Math.min(1, Math.max(0.1, fitScale));
+};
 
 export default function ModalPreview({
   selectedPreview,
@@ -21,13 +65,39 @@ export default function ModalPreview({
   dataMap,
   options,
   modalZoom,
-  setModalZoom,
-  modalContentRef
+  setModalZoom
 }: ModalPreviewProps) {
+  const modalContentRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const isPanningRef = useRef(false);
   const startRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0, pointerId: -1 });
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+
+  const resolvedPreviewPath = useMemo(() => {
+    if (!selectedPreview) {
+      return null;
+    }
+
+    return findMatchingPath(selectedPreview, imageHandles) ?? findMatchingPath(selectedPreview, dataMap) ?? selectedPreview;
+  }, [selectedPreview, imageHandles, dataMap]);
+
+  const selectedHandle = useMemo(() => {
+    if (!resolvedPreviewPath) {
+      return undefined;
+    }
+
+    const key = findMatchingPath(resolvedPreviewPath, imageHandles);
+    return key ? imageHandles.get(key) : undefined;
+  }, [resolvedPreviewPath, imageHandles]);
+
+  const selectedAnnotations = useMemo(() => {
+    if (!resolvedPreviewPath) {
+      return [];
+    }
+
+    const key = findMatchingPath(resolvedPreviewPath, dataMap);
+    return key ? (dataMap.get(key) ?? []) : [];
+  }, [resolvedPreviewPath, dataMap]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -42,7 +112,7 @@ export default function ModalPreview({
     if (!selectedPreview) return;
 
     const loadImageSize = async () => {
-      const handle = imageHandles.get(selectedPreview);
+      const handle = selectedHandle;
       if (!handle || !modalContentRef.current) return;
 
       try {
@@ -52,10 +122,7 @@ export default function ModalPreview({
         setImageSize(size);
 
         const container = modalContentRef.current;
-        const availW = container.clientWidth - 64;
-        const availH = container.clientHeight - 120;
-        const fitScale = Math.min(availW / size.width, availH / size.height);
-        setModalZoom(Math.min(1, fitScale));
+        setModalZoom(getFitScale(container, size.width, size.height));
         bmp.close();
       } catch (e) {
         console.warn('Failed to load image size:', e);
@@ -64,11 +131,9 @@ export default function ModalPreview({
     };
 
     void loadImageSize();
-  }, [selectedPreview, imageHandles, modalContentRef, setModalZoom]);
+  }, [selectedPreview, selectedHandle, setModalZoom]);
 
   if (!selectedPreview) return null;
-
-  const handle = imageHandles.get(selectedPreview);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!scrollRef.current) return;
@@ -149,10 +214,7 @@ export default function ModalPreview({
                 e.stopPropagation();
                 if (imageSize.width > 0 && modalContentRef.current) {
                   const container = modalContentRef.current;
-                  const availW = container.clientWidth - 64;
-                  const availH = container.clientHeight - 120;
-                  const fitScale = Math.min(availW / imageSize.width, availH / imageSize.height);
-                  setModalZoom(Math.min(1, fitScale));
+                  setModalZoom(getFitScale(container, imageSize.width, imageSize.height));
                 } else {
                   setModalZoom(1);
                 }
@@ -208,7 +270,7 @@ export default function ModalPreview({
               willChange: 'transform'
             }}
           >
-            <PreviewCanvas fileHandle={handle} annotations={dataMap.get(selectedPreview) ?? []} options={options} />
+            <PreviewCanvas fileHandle={selectedHandle} annotations={selectedAnnotations} options={options} />
           </div>
         </div>
       </div>

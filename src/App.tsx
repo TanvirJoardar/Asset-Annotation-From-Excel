@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import AppHeader from './components/AppHeader';
 import FileProcessingPanel from './components/FileProcessingPanel';
 import FolderPickerPanel from './components/FolderPickerPanel';
@@ -40,7 +40,6 @@ export default function App() {
 
   const [selectedPreview, setSelectedPreview] = useState<string | null>(null);
   const [modalZoom, setModalZoom] = useState(1);
-  const modalContentRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <div className="app-container animate-fade-in">
@@ -98,7 +97,6 @@ export default function App() {
         options={options}
         modalZoom={modalZoom}
         setModalZoom={setModalZoom}
-        modalContentRef={modalContentRef}
       />
     </div>
   );

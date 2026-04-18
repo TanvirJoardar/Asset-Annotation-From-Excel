@@ -208,7 +208,12 @@ export const buildProcessedWorkbook = async (
 };
 
 export interface AnnotationExtractionResult {
-  dataMap: Map<string, Annotation[]>;
+  groupedAnnotations: Map<string, {
+    block: string;
+    level: string;
+    imageName: string;
+    annotations: Annotation[];
+  }>;
   annotationsFound: number;
   invalidCoordsCount: number;
   invalidExamples: string[];
@@ -243,6 +248,11 @@ export const extractAnnotationsFromWorkbook = async (
     const key = normalize(h);
     return key === 'Background Image Name' || key === 'Background Image';
   });
+  const colProcessedBlock = headers.findIndex((h) => normalize(h).toLowerCase() === 'processed block');
+  const colProcessedLevel = headers.findIndex((h) => normalize(h).toLowerCase() === 'processed level');
+  const colBlock = headers.findIndex((h) => normalize(h).toLowerCase() === 'block');
+  const colLevel = headers.findIndex((h) => normalize(h).toLowerCase() === 'level');
+  const colLocationDescriptor = headers.findIndex((h) => normalize(h).toLowerCase() === 'location descriptor');
 
   const missingCols: string[] = [];
   if (colCoords === -1) {
@@ -256,7 +266,12 @@ export const extractAnnotationsFromWorkbook = async (
     throw new Error('Missing crucial columns: ' + missingCols.join(', '));
   }
 
-  const dataMap = new Map<string, Annotation[]>();
+  const groupedAnnotations = new Map<string, {
+    block: string;
+    level: string;
+    imageName: string;
+    annotations: Annotation[];
+  }>();
   let annotationsFound = 0;
   let invalidCoordsCount = 0;
   const invalidExamples: string[] = [];
@@ -279,6 +294,23 @@ export const extractAnnotationsFromWorkbook = async (
     const cleanedImageName = normalize(imageName);
     const parsed = parseCoordinates(coords);
 
+    const descriptor = colLocationDescriptor !== -1 ? row[colLocationDescriptor] : '';
+    const parsedFromDescriptor = parseBlockAndLevel(descriptor);
+
+    const resolvedBlock = normalize(
+      colProcessedBlock !== -1
+        ? row[colProcessedBlock]
+        : (colBlock !== -1 ? row[colBlock] : parsedFromDescriptor.block)
+    ) || parsedFromDescriptor.block;
+
+    const resolvedLevel = normalize(
+      colProcessedLevel !== -1
+        ? row[colProcessedLevel]
+        : (colLevel !== -1 ? row[colLevel] : parsedFromDescriptor.level)
+    ) || parsedFromDescriptor.level;
+
+    const groupKey = `${resolvedBlock.toLowerCase()}|${resolvedLevel.toLowerCase()}|${cleanedImageName.toLowerCase()}`;
+
     if (!parsed) {
       invalidCoordsCount++;
       if (invalidExamples.length < 5) {
@@ -287,11 +319,16 @@ export const extractAnnotationsFromWorkbook = async (
       continue;
     }
 
-    if (!dataMap.has(cleanedImageName)) {
-      dataMap.set(cleanedImageName, []);
+    if (!groupedAnnotations.has(groupKey)) {
+      groupedAnnotations.set(groupKey, {
+        block: resolvedBlock,
+        level: resolvedLevel,
+        imageName: cleanedImageName,
+        annotations: []
+      });
     }
 
-    dataMap.get(cleanedImageName)?.push({
+    groupedAnnotations.get(groupKey)?.annotations.push({
       id: sensorId,
       displayName: sensorDisplayName,
       x: parsed.x,
@@ -302,7 +339,7 @@ export const extractAnnotationsFromWorkbook = async (
   }
 
   return {
-    dataMap,
+    groupedAnnotations,
     annotationsFound,
     invalidCoordsCount,
     invalidExamples,

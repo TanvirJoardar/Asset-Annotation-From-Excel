@@ -8,10 +8,123 @@ import type {
   Annotation,
   AppDirectoryHandle,
   AppFileHandle,
+  DiscoveredImageFile,
   ProcessingSummary,
   RenderOptions,
   Stats
 } from '../types';
+
+const normalizeText = (value: unknown): string => (value ?? '').toString().trim();
+
+const normalizeKeyPart = (value: unknown): string => normalizeText(value).toLowerCase();
+
+const isUnknownValue = (value: string): boolean => {
+  const key = normalizeKeyPart(value);
+  return !key || key === 'blank' || key === 'missing';
+};
+
+const extractLevelFromText = (value: string): string | null => {
+  const normalized = normalizeText(value);
+  const match = normalized.match(/(?:^|[_\s-])([LB]\d{1,3})(?=$|[_\s.-])/i);
+  return match ? match[1].toUpperCase() : null;
+};
+
+const extractBlockFromText = (value: string): string | null => {
+  const normalized = normalizeText(value);
+  const [firstToken] = normalized.split(/[_\s-]+/).filter(Boolean);
+  return firstToken ?? null;
+};
+
+const sanitizePathPart = (value: string, fallback: string): string => {
+  const cleaned = normalizeText(value).replace(/[\\/]+/g, '-');
+  return cleaned || fallback;
+};
+
+const getImageBaseName = (value: string): string => {
+  const normalized = normalizeText(value).replace(/\\/g, '/');
+  const fileName = normalized.split('/').pop() ?? normalized;
+  return fileName.replace(/\.[^.]+$/, '') || 'missing-image';
+};
+
+const buildOutputPath = (block: string, level: string, imageNameOrPath: string): string => {
+  const blockSafe = sanitizePathPart(block, 'missing-block');
+  const levelSafe = sanitizePathPart(level, 'missing-level');
+  const imageBase = sanitizePathPart(getImageBaseName(imageNameOrPath), 'missing-image');
+  return `${blockSafe}/${levelSafe}/${imageBase}.png`;
+};
+
+const resolveBlockAndLevel = (
+  block: string,
+  level: string,
+  imageName: string,
+  matchedImagePath?: string
+): { block: string; level: string } => {
+  let resolvedBlock = normalizeText(block);
+  let resolvedLevel = normalizeText(level);
+
+  const pathSegments = normalizeText(matchedImagePath).replace(/\\/g, '/').split('/').filter(Boolean);
+  const blockFromPath = pathSegments[0] ?? '';
+  const levelFromPath = pathSegments.length > 2 ? pathSegments.slice(1, -1).join('/') : '';
+
+  if (isUnknownValue(resolvedBlock) && blockFromPath) {
+    resolvedBlock = blockFromPath;
+  }
+
+  if (isUnknownValue(resolvedLevel)) {
+    if (levelFromPath) {
+      resolvedLevel = levelFromPath;
+    } else {
+      const levelFromName = extractLevelFromText(imageName)
+        ?? extractLevelFromText(pathSegments[pathSegments.length - 1] ?? '');
+      if (levelFromName) {
+        resolvedLevel = levelFromName;
+      }
+    }
+  }
+
+  if (isUnknownValue(resolvedBlock)) {
+    const blockFromName = extractBlockFromText(imageName);
+    if (blockFromName) {
+      resolvedBlock = blockFromName;
+    }
+  }
+
+  if (isUnknownValue(resolvedBlock)) {
+    resolvedBlock = 'Unassigned Block';
+  }
+
+  if (isUnknownValue(resolvedLevel)) {
+    resolvedLevel = 'Unassigned Level';
+  }
+
+  return {
+    block: resolvedBlock,
+    level: resolvedLevel
+  };
+};
+
+const pickImageForGroup = (
+  imageFiles: DiscoveredImageFile[],
+  block: string,
+  level: string,
+  imageName: string
+): DiscoveredImageFile | undefined => {
+  const blockLower = normalizeKeyPart(block);
+  const levelLower = normalizeKeyPart(level);
+  const imageNameLower = normalizeKeyPart(imageName);
+
+  const sameName = imageFiles.filter((file) => file.fileNameLower === imageNameLower);
+  const inBlock = blockLower ? sameName.filter((file) => file.segmentsLower.includes(blockLower)) : sameName;
+  const pool = inBlock.length > 0 ? inBlock : sameName;
+
+  if (pool.length === 0) {
+    return undefined;
+  }
+
+  const inLevel = levelLower ? pool.filter((file) => file.segmentsLower.includes(levelLower)) : pool;
+  const ranked = (inLevel.length > 0 ? inLevel : pool).sort((a, b) => a.path.length - b.path.length);
+  return ranked[0];
+};
 
 const drawCirclesOnImage = async (
   fileHandle: AppFileHandle,
@@ -74,7 +187,7 @@ const drawCirclesOnImage = async (
 export function useAssetAnnotationWorkflow() {
   const [directoryHandle, setDirectoryHandle] = useState<AppDirectoryHandle | null>(null);
   const [excelHandle, setExcelHandle] = useState<AppFileHandle | null>(null);
-  const [allImageHandlesByName, setAllImageHandlesByName] = useState<Map<string, AppFileHandle>>(new Map());
+  const [allImageFiles, setAllImageFiles] = useState<DiscoveredImageFile[]>([]);
   const [isFileProcessing, setIsFileProcessing] = useState(false);
   const [isFileProcessed, setIsFileProcessed] = useState(false);
   const [processedWorkbookBlob, setProcessedWorkbookBlob] = useState<Blob | null>(null);
@@ -106,7 +219,7 @@ export function useAssetAnnotationWorkflow() {
 
   const resetWorkspaceState = useCallback(() => {
     setExcelHandle(null);
-    setAllImageHandlesByName(new Map());
+    setAllImageFiles([]);
     setIsFileProcessing(false);
     setIsFileProcessed(false);
     setProcessedWorkbookBlob(null);
@@ -156,7 +269,7 @@ export function useAssetAnnotationWorkflow() {
     setIsFileProcessing(true);
 
     try {
-      const { excelFileHandle, imageMap } = await collectExcelAndImageHandles(directoryHandle);
+      const { excelFileHandle, imageFiles } = await collectExcelAndImageHandles(directoryHandle);
       if (!excelFileHandle) {
         alert('No Excel or CSV file found in the chosen folder.');
         setIsFileProcessing(false);
@@ -171,7 +284,7 @@ export function useAssetAnnotationWorkflow() {
       setProcessingSummary(processed.summary);
       setShowLevelIssueBlocks(false);
       setExcelHandle(excelFileHandle);
-      setAllImageHandlesByName(imageMap);
+      setAllImageFiles(imageFiles);
       setIsFileProcessed(true);
       setIsProcessed(false);
       setDataMap(new Map());
@@ -201,17 +314,17 @@ export function useAssetAnnotationWorkflow() {
 
     try {
       let excelFileNode = excelHandle;
-      let availableImageHandles = allImageHandlesByName;
+      let availableImageFiles = allImageFiles;
 
-      if (!excelFileNode || availableImageHandles.size === 0) {
+      if (!excelFileNode || availableImageFiles.length === 0) {
         const discovered = await collectExcelAndImageHandles(directoryHandle);
         excelFileNode = discovered.excelFileHandle;
-        availableImageHandles = discovered.imageMap;
+        availableImageFiles = discovered.imageFiles;
 
         if (excelFileNode) {
           setExcelHandle(excelFileNode);
         }
-        setAllImageHandlesByName(availableImageHandles);
+        setAllImageFiles(availableImageFiles);
       }
 
       if (!excelFileNode) {
@@ -223,7 +336,36 @@ export function useAssetAnnotationWorkflow() {
       const file = await excelFileNode.getFile();
       const annotationData = await extractAnnotationsFromWorkbook(file, deleteFirstRowOnAnnotation);
 
-      setDataMap(annotationData.dataMap);
+      const nextDataMap = new Map<string, Annotation[]>();
+      const nextImageHandles = new Map<string, AppFileHandle>();
+
+      const sortedGroups = Array.from(annotationData.groupedAnnotations.values()).sort((a, b) => {
+        const aKey = `${a.block}/${a.level}/${a.imageName}`.toLowerCase();
+        const bKey = `${b.block}/${b.level}/${b.imageName}`.toLowerCase();
+        return aKey.localeCompare(bKey);
+      });
+
+      for (const group of sortedGroups) {
+        const matchedImage = pickImageForGroup(availableImageFiles, group.block, group.level, group.imageName);
+        const { block: resolvedBlock, level: resolvedLevel } = resolveBlockAndLevel(
+          group.block,
+          group.level,
+          group.imageName,
+          matchedImage?.path
+        );
+        const outputPath = buildOutputPath(
+          resolvedBlock,
+          resolvedLevel,
+          matchedImage ? matchedImage.path : group.imageName
+        );
+
+        nextDataMap.set(outputPath, group.annotations);
+        if (matchedImage) {
+          nextImageHandles.set(outputPath, matchedImage.handle);
+        }
+      }
+
+      setDataMap(nextDataMap);
 
       if (annotationData.invalidCoordsCount > 0) {
         alert(`${annotationData.invalidCoordsCount} rows had invalid coordinates and were skipped. Examples: ${annotationData.invalidExamples.join(', ')}`);
@@ -236,16 +378,8 @@ export function useAssetAnnotationWorkflow() {
       setStats({
         excelFiles: 1,
         annotationsFound: annotationData.annotationsFound,
-        distinctImages: annotationData.dataMap.size
+        distinctImages: nextDataMap.size
       });
-
-      const nextImageHandles = new Map<string, AppFileHandle>();
-      for (const [imgName] of annotationData.dataMap.entries()) {
-        const handle = availableImageHandles.get(imgName);
-        if (handle) {
-          nextImageHandles.set(imgName, handle);
-        }
-      }
 
       setImageHandles(nextImageHandles);
       setIsProcessed(true);
@@ -255,7 +389,7 @@ export function useAssetAnnotationWorkflow() {
     } finally {
       setIsProcessing(false);
     }
-  }, [allImageHandlesByName, deleteFirstRowOnAnnotation, directoryHandle, excelHandle]);
+  }, [allImageFiles, deleteFirstRowOnAnnotation, directoryHandle, excelHandle]);
 
   const exportZip = useCallback(async () => {
     if (dataMap.size === 0) {
@@ -271,8 +405,7 @@ export function useAssetAnnotationWorkflow() {
         const handle = imageHandles.get(imgName);
         if (handle) {
           const annotatedBlob = await drawCirclesOnImage(handle, annotations, options);
-          const finalName = imgName.replace(/\.(jpg|jpeg|png)$/i, '') + '.png';
-          zip.file(finalName, annotatedBlob);
+          zip.file(imgName, annotatedBlob);
         }
       });
 

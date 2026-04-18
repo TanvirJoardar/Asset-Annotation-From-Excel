@@ -15,6 +15,15 @@ export interface Annotation {
   y: number;
 }
 
+export interface DiscoveredImageFile {
+  handle: AppFileHandle;
+  path: string;
+  pathLower: string;
+  fileName: string;
+  fileNameLower: string;
+  segmentsLower: string[];
+}
+
 export interface Stats {
   excelFiles: number;
   annotationsFound: number;
