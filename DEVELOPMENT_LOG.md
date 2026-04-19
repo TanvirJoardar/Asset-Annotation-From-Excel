@@ -172,6 +172,30 @@ This file tracks what has been developed in this project.
 
 ## 2026-04-17
 
+### Additional Update (Large Image Safe Rendering for Preview/Export)
+- Added shared safe-render planning utility for very large images:
+  - limits canvas dimensions and area to browser-safe bounds,
+  - scales render output and annotation coordinates proportionally.
+- Applied safe-render strategy to:
+  - preview rendering (`PreviewCanvas`),
+  - annotated image export rendering.
+- This prevents failures like PNG blob encode errors on oversized images (e.g. `23438x15733`).
+- Preview now shows a `Scaled Preview` badge when downscaling is applied.
+- Added graceful preview fallback message when render fails.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Faster Export + PNG Encode Failure Mitigation)
+- Improved annotated ZIP export speed by moving from single-file sequential rendering to controlled parallel workers.
+- Worker count is automatically bounded (max 3) to balance speed and memory usage.
+- ZIP generation now uses `STORE` compression for much faster packaging on large exports.
+- Hardened PNG encode pipeline for large images:
+  - better error diagnostics include canvas dimensions,
+  - DPI conversion path now has a resilient fallback when blob-to-dataURL read fails under memory pressure.
+- Existing decode/render failure reporting with block/level remains active.
+- Validation status:
+  - `npm run typecheck` passes
+
 ### Additional Update (Export Decode Error Details with Block/Level)
 - Enhanced annotated ZIP export failure reporting to include `Block` and `Level` for skipped images.
 - On decode/render failure (or missing image handle), completion alert now lists failed items with:

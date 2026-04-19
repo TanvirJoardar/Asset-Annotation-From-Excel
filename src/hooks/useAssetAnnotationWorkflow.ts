@@ -4,6 +4,7 @@ import { saveAs } from 'file-saver';
 import { changeDpiDataUrl } from 'dpi-tools';
 import { collectExcelAndImageHandles } from '../utils/fileDiscovery';
 import { buildProcessedWorkbook, extractAnnotationsFromWorkbook } from '../utils/workbookProcessing';
+import { getSafeRenderPlan } from '../utils/imageRendering';
 import type {
   Annotation,
   AppDirectoryHandle,
@@ -165,21 +166,27 @@ const drawCirclesOnImage = async (
 
   try {
     const canvas = document.createElement('canvas');
-    canvas.width = bmp.width;
-    canvas.height = bmp.height;
+    const renderPlan = getSafeRenderPlan(bmp.width, bmp.height);
+    canvas.width = renderPlan.width;
+    canvas.height = renderPlan.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       throw new Error('Failed to get canvas context for image rendering.');
     }
 
-    ctx.drawImage(bmp, 0, 0);
+    ctx.drawImage(bmp, 0, 0, renderPlan.width, renderPlan.height);
+
+    const radius = Math.max(1, options.radius * renderPlan.scale);
+    const textSize = Math.max(8, Math.round(options.radius * renderPlan.scale));
 
     for (const ann of annotations) {
       const rawX = Number.isFinite(ann.x) ? ann.x : 0;
       const rawY = Number.isFinite(ann.y) ? ann.y : 0;
+      const x = rawX * renderPlan.scale;
+      const y = rawY * renderPlan.scale;
 
       ctx.beginPath();
-      ctx.arc(rawX, rawY, options.radius, 0, Math.PI * 2);
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fillStyle = options.color;
       ctx.fill();
 
@@ -187,16 +194,16 @@ const drawCirclesOnImage = async (
         const labelText = options.labelType === 'displayName'
           ? (ann.displayName || ann.id || '')
           : (ann.id || ann.displayName || '');
-        ctx.font = `bold ${options.radius}px Inter`;
+        ctx.font = `bold ${textSize}px Inter`;
         ctx.fillStyle = options.color;
-        ctx.fillText(labelText, rawX + options.radius + 5, rawY + 5);
+        ctx.fillText(labelText, x + radius + 5, y + 5);
       }
     }
 
     const pngBlob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((blob) => {
         if (!blob) {
-          reject(new Error('Failed to encode annotated image as PNG blob.'));
+          reject(new Error(`Failed to encode annotated image as PNG blob (size: ${canvas.width}x${canvas.height}).`));
           return;
         }
         resolve(blob);
@@ -207,12 +214,18 @@ const drawCirclesOnImage = async (
       return pngBlob;
     }
 
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ''));
-      reader.onerror = () => reject(new Error('Failed reading rendered PNG blob.'));
-      reader.readAsDataURL(pngBlob);
-    });
+    let dataUrl: string;
+    try {
+      dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ''));
+        reader.onerror = () => reject(new Error('Failed reading rendered PNG blob.'));
+        reader.readAsDataURL(pngBlob);
+      });
+    } catch {
+      // Last-resort fallback when blob read fails under memory pressure.
+      dataUrl = canvas.toDataURL('image/png');
+    }
 
     try {
       const finalUrl = changeDpiDataUrl(dataUrl, options.dpi);
@@ -524,6 +537,7 @@ export function useAssetAnnotationWorkflow() {
       const zip = new JSZip();
       const entries = Array.from(dataMap.entries()).filter(([imgName]) => imageHandles.has(imgName));
       const total = entries.length;
+      const maxWorkers = Math.max(1, Math.min(3, (typeof navigator !== 'undefined' ? Math.floor((navigator.hardwareConcurrency || 4) / 2) : 2)));
 
       if (total === 0) {
         alert('No matching images found to export.');
@@ -533,10 +547,20 @@ export function useAssetAnnotationWorkflow() {
       let completed = 0;
       let failed = 0;
       const failedItems: Array<{ imagePath: string; block: string; level: string; reason: string }> = [];
+      let nextIndex = 0;
 
-      for (const [imgName, annotations] of entries) {
+      const processNext = async (): Promise<void> => {
+        const currentIndex = nextIndex;
+        nextIndex++;
+
+        if (currentIndex >= total) {
+          return;
+        }
+
+        const [imgName, annotations] = entries[currentIndex];
         const handle = imageHandles.get(imgName);
         const { block, level } = extractBlockAndLevelFromOutputPath(imgName);
+
         if (!handle) {
           failed++;
           failedItems.push({
@@ -545,29 +569,30 @@ export function useAssetAnnotationWorkflow() {
             level,
             reason: 'Image file handle not found in selected folder.'
           });
-          completed++;
-          continue;
-        }
-
-        try {
-          const annotatedBlob = await drawCirclesOnImage(handle, annotations, options);
-          zip.file(imgName, annotatedBlob);
-        } catch (error) {
-          failed++;
-          const reason = error instanceof Error ? error.message : 'Unknown decode/render error.';
-          failedItems.push({ imagePath: imgName, block, level, reason });
-          console.warn(`Skipping image during export due to decode/render error: ${imgName}`, error);
+        } else {
+          try {
+            const annotatedBlob = await drawCirclesOnImage(handle, annotations, options);
+            zip.file(imgName, annotatedBlob);
+          } catch (error) {
+            failed++;
+            const reason = error instanceof Error ? error.message : 'Unknown decode/render error.';
+            failedItems.push({ imagePath: imgName, block, level, reason });
+            console.warn(`Skipping image during export due to decode/render error: ${imgName}`, error);
+          }
         }
 
         completed++;
         setExportProgressPercent(Math.max(1, Math.min(90, Math.round((completed / total) * 90))));
         setExportProgressLabel(`Rendering ${completed}/${total}`);
 
-        // Yield to browser so UI stays responsive during large exports.
         await new Promise<void>((resolve) => {
           requestAnimationFrame(() => resolve());
         });
-      }
+
+        await processNext();
+      };
+
+      await Promise.all(Array.from({ length: Math.min(maxWorkers, total) }, () => processNext()));
 
       setExportProgressLabel('Compressing ZIP...');
 
@@ -575,8 +600,7 @@ export function useAssetAnnotationWorkflow() {
         {
           type: 'blob',
           streamFiles: true,
-          compression: 'DEFLATE',
-          compressionOptions: { level: 3 }
+          compression: 'STORE'
         },
         (metadata) => {
           const zipPercent = Math.round(metadata.percent);
