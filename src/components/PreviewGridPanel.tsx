@@ -76,6 +76,8 @@ interface PreviewGridPanelProps {
   onEditOptions: () => void;
   onExport: () => void | Promise<void>;
   isExporting: boolean;
+  exportProgressPercent: number;
+  exportProgressLabel: string;
   onOpenPreview: (imageName: string) => void;
 }
 
@@ -87,6 +89,8 @@ export default function PreviewGridPanel({
   onEditOptions,
   onExport,
   isExporting,
+  exportProgressPercent,
+  exportProgressLabel,
   onOpenPreview
 }: PreviewGridPanelProps) {
   const groupedByBlock = useMemo(() => {
@@ -150,10 +154,28 @@ export default function PreviewGridPanel({
           </button>
           <button className="btn btn-primary" onClick={() => void onExport()} disabled={isExporting || dataMap.size === 0}>
             {isExporting ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
-            {isExporting ? 'Packaging...' : 'Export Annotated ZIP'}
+            {isExporting ? `Packaging... ${exportProgressPercent}%` : 'Export Annotated ZIP'}
           </button>
         </div>
       </div>
+
+      {isExporting && (
+        <div style={{ marginTop: '-0.5rem', marginBottom: '0.8rem', display: 'grid', gap: '0.35rem' }}>
+          <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+            {exportProgressLabel || 'Preparing export...'}
+          </div>
+          <div style={{ height: '8px', borderRadius: '999px', background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${Math.max(0, Math.min(100, exportProgressPercent))}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #22d3ee, #22c55e)',
+                transition: 'width 120ms ease-out'
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="mt-4" style={{ display: 'grid', gap: '1.25rem' }}>
         <div className="preview-tabs" role="tablist" aria-label="Blocks">

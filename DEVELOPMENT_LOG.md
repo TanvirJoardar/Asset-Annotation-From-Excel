@@ -172,6 +172,34 @@ This file tracks what has been developed in this project.
 
 ## 2026-04-17
 
+### Additional Update (Export Decode Error Details with Block/Level)
+- Enhanced annotated ZIP export failure reporting to include `Block` and `Level` for skipped images.
+- On decode/render failure (or missing image handle), completion alert now lists failed items with:
+  - Block
+  - Level
+  - Image path
+  - Reason
+- For large failure sets, alert shows a capped preview list and indicates remaining count.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Efficient ZIP Export + Progress Status)
+- Improved annotated ZIP export to reduce browser freeze and RAM spikes.
+- Replaced parallel all-at-once image rendering with sequential export processing to keep memory usage stable.
+- Added per-image failure isolation:
+  - decode/render failures are skipped,
+  - export can continue for remaining images,
+  - user gets a skipped-count message after completion.
+- Improved rendering pipeline efficiency:
+  - switched from heavy `canvas.toDataURL` default path to `canvas.toBlob` for PNG generation,
+  - still attempts DPI metadata application when configured.
+- Added live export progress UI:
+  - button shows percent done,
+  - progress label (`Rendering x/y`, `Compressing ZIP...`),
+  - progress bar visible while export is running.
+- Validation status:
+  - `npm run typecheck` passes
+
 ### Additional Update (Interactive Conflict Fix for Background Image Names)
 - Upgraded `Block/Level with Multiple Background Image Name Values` issues into a selectable fix workflow.
 - Each conflict now shows image capsules with occurrence counts.

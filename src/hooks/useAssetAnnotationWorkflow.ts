@@ -72,6 +72,16 @@ const buildOutputPath = (block: string, level: string, imageNameOrPath: string):
   return `${blockSafe}/${levelSafe}/${imageBase}.png`;
 };
 
+const extractBlockAndLevelFromOutputPath = (outputPath: string): { block: string; level: string } => {
+  const segments = normalizeText(outputPath).replace(/\\/g, '/').split('/').filter(Boolean);
+  const block = segments[0] || 'Unknown Block';
+  const level = segments.length > 2
+    ? segments.slice(1, -1).join('/')
+    : (segments[1] || 'Unknown Level');
+
+  return { block, level };
+};
+
 const resolveBlockAndLevel = (
   block: string,
   level: string,
@@ -153,54 +163,68 @@ const drawCirclesOnImage = async (
   const file = await fileHandle.getFile();
   const bmp = await createImageBitmap(file);
 
-  const canvas = document.createElement('canvas');
-  canvas.width = bmp.width;
-  canvas.height = bmp.height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    bmp.close();
-    return new Blob();
-  }
-
-  ctx.drawImage(bmp, 0, 0);
-
-  for (const ann of annotations) {
-    const rawX = Number.isFinite(ann.x) ? ann.x : 0;
-    const rawY = Number.isFinite(ann.y) ? ann.y : 0;
-
-    ctx.beginPath();
-    ctx.arc(rawX, rawY, options.radius, 0, Math.PI * 2);
-    ctx.fillStyle = options.color;
-    ctx.fill();
-
-    if (options.drawText) {
-      const labelText = options.labelType === 'displayName'
-        ? (ann.displayName || ann.id || '')
-        : (ann.id || ann.displayName || '');
-      ctx.font = `bold ${options.radius}px Inter`;
-      ctx.fillStyle = options.color;
-      ctx.fillText(labelText, rawX + options.radius + 5, rawY + 5);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to get canvas context for image rendering.');
     }
-  }
 
-  bmp.close();
+    ctx.drawImage(bmp, 0, 0);
 
-  return new Promise((resolve) => {
-    const dataUrl = canvas.toDataURL('image/png');
-    let finalUrl = dataUrl;
+    for (const ann of annotations) {
+      const rawX = Number.isFinite(ann.x) ? ann.x : 0;
+      const rawY = Number.isFinite(ann.y) ? ann.y : 0;
+
+      ctx.beginPath();
+      ctx.arc(rawX, rawY, options.radius, 0, Math.PI * 2);
+      ctx.fillStyle = options.color;
+      ctx.fill();
+
+      if (options.drawText) {
+        const labelText = options.labelType === 'displayName'
+          ? (ann.displayName || ann.id || '')
+          : (ann.id || ann.displayName || '');
+        ctx.font = `bold ${options.radius}px Inter`;
+        ctx.fillStyle = options.color;
+        ctx.fillText(labelText, rawX + options.radius + 5, rawY + 5);
+      }
+    }
+
+    const pngBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Failed to encode annotated image as PNG blob.'));
+          return;
+        }
+        resolve(blob);
+      }, 'image/png');
+    });
+
+    if (!options.dpi || options.dpi === 72) {
+      return pngBlob;
+    }
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ''));
+      reader.onerror = () => reject(new Error('Failed reading rendered PNG blob.'));
+      reader.readAsDataURL(pngBlob);
+    });
 
     try {
-      if (options.dpi && options.dpi !== 72) {
-        finalUrl = changeDpiDataUrl(dataUrl, options.dpi);
-      }
+      const finalUrl = changeDpiDataUrl(dataUrl, options.dpi);
+      const result = await fetch(finalUrl);
+      return await result.blob();
     } catch (e) {
-      console.warn('Failed to apply DPI metadata:', e);
+      console.warn('Failed to apply DPI metadata, using standard PNG blob:', e);
+      return pngBlob;
     }
-
-    fetch(finalUrl)
-      .then((res) => res.blob())
-      .then((blob) => resolve(blob));
-  });
+  } finally {
+    bmp.close();
+  }
 };
 
 export function useAssetAnnotationWorkflow() {
@@ -237,6 +261,8 @@ export function useAssetAnnotationWorkflow() {
   const [imageHandles, setImageHandles] = useState<Map<string, AppFileHandle>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgressPercent, setExportProgressPercent] = useState(0);
+  const [exportProgressLabel, setExportProgressLabel] = useState('');
   const [stats, setStats] = useState<Stats>({ excelFiles: 0, annotationsFound: 0, distinctImages: 0 });
 
   const [options, setOptions] = useState<RenderOptions>({
@@ -275,6 +301,8 @@ export function useAssetAnnotationWorkflow() {
     setShowLevelIssueBlocks(false);
     setShowProcessingIssues(false);
     setSelectedConflictImageByKey({});
+    setExportProgressPercent(0);
+    setExportProgressLabel('');
     setIsProcessed(false);
     setDataMap(new Map());
     setImageHandles(new Map());
@@ -489,25 +517,92 @@ export function useAssetAnnotationWorkflow() {
     }
 
     setIsExporting(true);
+    setExportProgressPercent(0);
+    setExportProgressLabel('Preparing images...');
 
     try {
       const zip = new JSZip();
+      const entries = Array.from(dataMap.entries()).filter(([imgName]) => imageHandles.has(imgName));
+      const total = entries.length;
 
-      const promises = Array.from(dataMap.entries()).map(async ([imgName, annotations]) => {
+      if (total === 0) {
+        alert('No matching images found to export.');
+        return;
+      }
+
+      let completed = 0;
+      let failed = 0;
+      const failedItems: Array<{ imagePath: string; block: string; level: string; reason: string }> = [];
+
+      for (const [imgName, annotations] of entries) {
         const handle = imageHandles.get(imgName);
-        if (handle) {
+        const { block, level } = extractBlockAndLevelFromOutputPath(imgName);
+        if (!handle) {
+          failed++;
+          failedItems.push({
+            imagePath: imgName,
+            block,
+            level,
+            reason: 'Image file handle not found in selected folder.'
+          });
+          completed++;
+          continue;
+        }
+
+        try {
           const annotatedBlob = await drawCirclesOnImage(handle, annotations, options);
           zip.file(imgName, annotatedBlob);
+        } catch (error) {
+          failed++;
+          const reason = error instanceof Error ? error.message : 'Unknown decode/render error.';
+          failedItems.push({ imagePath: imgName, block, level, reason });
+          console.warn(`Skipping image during export due to decode/render error: ${imgName}`, error);
         }
-      });
 
-      await Promise.all(promises);
+        completed++;
+        setExportProgressPercent(Math.max(1, Math.min(90, Math.round((completed / total) * 90))));
+        setExportProgressLabel(`Rendering ${completed}/${total}`);
 
-      const content = await zip.generateAsync({ type: 'blob' });
+        // Yield to browser so UI stays responsive during large exports.
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        });
+      }
+
+      setExportProgressLabel('Compressing ZIP...');
+
+      const content = await zip.generateAsync(
+        {
+          type: 'blob',
+          streamFiles: true,
+          compression: 'DEFLATE',
+          compressionOptions: { level: 3 }
+        },
+        (metadata) => {
+          const zipPercent = Math.round(metadata.percent);
+          setExportProgressPercent(Math.min(100, 90 + Math.round(zipPercent * 0.1)));
+        }
+      );
+
       saveAs(content, 'Annotated_Images.zip');
+
+      if (failed > 0) {
+        const previewItems = failedItems.slice(0, 12).map((item, index) => (
+          `${index + 1}. Block: ${item.block} | Level: ${item.level} | Image: ${item.imagePath} | Reason: ${item.reason}`
+        ));
+        const remaining = failedItems.length - previewItems.length;
+        const moreText = remaining > 0 ? `\n...and ${remaining} more.` : '';
+
+        alert(
+          `Export finished with ${failed} skipped image(s).\n\n` +
+          `Failed items:\n${previewItems.join('\n')}${moreText}`
+        );
+      }
     } catch (err) {
       alert('Error generating zip: ' + (err as Error).message);
     } finally {
+      setExportProgressPercent(0);
+      setExportProgressLabel('');
       setIsExporting(false);
     }
   }, [dataMap, imageHandles, options]);
@@ -554,6 +649,8 @@ export function useAssetAnnotationWorkflow() {
     editOptions,
     exportZip,
     isExporting,
+    exportProgressPercent,
+    exportProgressLabel,
     selectFolder
   };
 }

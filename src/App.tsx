@@ -40,6 +40,8 @@ export default function App() {
     editOptions,
     exportZip,
     isExporting,
+    exportProgressPercent,
+    exportProgressLabel,
     selectFolder
   } = useAssetAnnotationWorkflow();
 
@@ -94,6 +96,8 @@ export default function App() {
             onEditOptions={editOptions}
             onExport={exportZip}
             isExporting={isExporting}
+            exportProgressPercent={exportProgressPercent}
+            exportProgressLabel={exportProgressLabel}
             onOpenPreview={setSelectedPreview}
           />
         </>
