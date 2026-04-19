@@ -80,7 +80,7 @@ export default function FileProcessingPanel({
           </div>
           <div className="stat-card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-              <span className="stat-label">Rows With Missing/Blank Block</span>
+              <span className="stat-label">Rows With Blank Block</span>
               <button
                 type="button"
                 className="btn btn-secondary"

@@ -4,6 +4,14 @@ This file tracks what has been developed in this project.
 
 ## 2026-04-19
 
+### Additional Update (Processing Row Count Inflation Fix)
+- Fixed an inflated `Rows Evaluated` count during file processing.
+- Root cause: empty worksheet rows were being expanded when inserting `Processed Block`/`Processed Level`, then incorrectly counted as data rows.
+- Updated processing loop to validate row content from original source row data before counting/issue checks.
+- Result: summary counts now align with actual non-empty data rows in Excel.
+- Validation status:
+  - `npm run typecheck` passes
+
 ### Additional Update (Reduced Red Tint in Issues Panel)
 - Tuned Processing Issues visual theme to reduce the heavy red glass background.
 - Switched panel and section backgrounds to neutral dark slate tones.

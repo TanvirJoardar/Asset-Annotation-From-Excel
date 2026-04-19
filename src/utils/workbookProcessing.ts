@@ -155,7 +155,15 @@ export const buildProcessedWorkbook = async (
 
   for (let i = headerRowIndex + 1; i < updatedRows.length; i++) {
     const row = updatedRows[i];
-    if (!Array.isArray(row) || row.length === 0) {
+    const sourceRow = jsonRaw[i];
+
+    if (!Array.isArray(row) || row.length === 0 || !Array.isArray(sourceRow)) {
+      continue;
+    }
+
+    // Count/process only rows that had actual source values before we inserted processed columns.
+    const sourceHasContent = sourceRow.some((cell) => normalize(cell) !== '');
+    if (!sourceHasContent) {
       continue;
     }
 
