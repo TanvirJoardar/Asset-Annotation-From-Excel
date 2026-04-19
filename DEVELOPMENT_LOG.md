@@ -172,6 +172,34 @@ This file tracks what has been developed in this project.
 
 ## 2026-04-17
 
+### Additional Update (Zero Count Includes Single Coordinate Value)
+- Fixed coordinate zero-value detection to include rows where only one numeric coordinate is present and that value is `0`.
+- Previous behavior only counted zero when a valid `x,y` pair existed.
+- Updated logic in `src/utils/workbookProcessing.ts`:
+  - Counts zero for single-value coordinates (`0`).
+  - Keeps existing zero detection for valid coordinate pairs where `x = 0` or `y = 0`.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Coordinates: X or Y Equals 0 Count)
+- Added a new coordinate issue metric for rows where parsed coordinate value has either `x = 0` or `y = 0`.
+- Updated processing summary model and state with:
+  - `zeroValueCount`
+- Updated total coordinate issue count and status logic to include this new metric.
+- Added a dedicated metric card in Processing Issues UI:
+  - `X or Y Equals 0`
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Coordinates >2 Values Count Re-Applied)
+- Re-applied and verified support for counting coordinate rows with more than two numeric values.
+- Updated processing logic to detect numeric token count in `Coordinates` and increment when count is greater than 2.
+- Updated summary model/state and Processing Issues UI metric card:
+  - `More Than 2 Values`
+- Updated total issue and `hasIssues` calculations to include this metric.
+- Validation status:
+  - `npm run typecheck` passes
+
 ### Implemented
 - Refactored `App.jsx` into reusable UI components for better readability and maintainability.
 - Added component files:

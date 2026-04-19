@@ -161,6 +161,14 @@ export default function FileProcessingPanel({
                 <span className="issue-metric-label">Only X or Y</span>
                 <span className="issue-metric-value">{processingSummary.coordinateIssues.singleValueCount}</span>
               </div>
+              <div className="issue-metric-card multi">
+                <span className="issue-metric-label">More Than 2 Values</span>
+                <span className="issue-metric-value">{processingSummary.coordinateIssues.moreThanTwoValuesCount}</span>
+              </div>
+              <div className="issue-metric-card zero">
+                <span className="issue-metric-label">X or Y Equals 0</span>
+                <span className="issue-metric-value">{processingSummary.coordinateIssues.zeroValueCount}</span>
+              </div>
             </div>
           </section>
 

@@ -38,6 +38,8 @@ export interface ProcessingSummary {
   coordinateIssues: {
     blankCount: number;
     singleValueCount: number;
+    moreThanTwoValuesCount: number;
+    zeroValueCount: number;
     totalCount: number;
   };
   blockLevelBackgroundImageConflicts: Array<{

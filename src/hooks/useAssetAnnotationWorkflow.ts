@@ -202,6 +202,8 @@ export function useAssetAnnotationWorkflow() {
     coordinateIssues: {
       blankCount: 0,
       singleValueCount: 0,
+      moreThanTwoValuesCount: 0,
+      zeroValueCount: 0,
       totalCount: 0
     },
     blockLevelBackgroundImageConflicts: [],
@@ -242,6 +244,8 @@ export function useAssetAnnotationWorkflow() {
       coordinateIssues: {
         blankCount: 0,
         singleValueCount: 0,
+        moreThanTwoValuesCount: 0,
+        zeroValueCount: 0,
         totalCount: 0
       },
       blockLevelBackgroundImageConflicts: [],

@@ -145,6 +145,8 @@ export const buildProcessedWorkbook = async (
   let validBlockLevel = 0;
   let coordinateBlankCount = 0;
   let coordinateSingleValueCount = 0;
+  let coordinateMoreThanTwoValuesCount = 0;
+  let coordinateZeroValueCount = 0;
   const blocksWithMissingOrBlankLevelMap = new Map<string, { missingCount: number; blankCount: number }>();
   const blockLevelImageMap = new Map<string, {
     blockName: string;
@@ -205,8 +207,17 @@ export const buildProcessedWorkbook = async (
         coordinateBlankCount++;
       } else {
         const parts = coordinatesText.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
-        if (parts.length === 1 && isNumericValue(parts[0])) {
+        const numericParts = parts.filter((part) => isNumericValue(part));
+        if (numericParts.length === 1) {
           coordinateSingleValueCount++;
+        } else if (numericParts.length > 2) {
+          coordinateMoreThanTwoValuesCount++;
+        }
+
+        const singleValueIsZero = numericParts.length === 1 && Number(numericParts[0]) === 0;
+        const parsedCoordinate = parseCoordinates(coordinatesText);
+        if (singleValueIsZero || (parsedCoordinate && (parsedCoordinate.x === 0 || parsedCoordinate.y === 0))) {
+          coordinateZeroValueCount++;
         }
       }
     }
@@ -289,7 +300,13 @@ export const buildProcessedWorkbook = async (
       coordinateIssues: {
         blankCount: coordinateBlankCount,
         singleValueCount: coordinateSingleValueCount,
-        totalCount: coordinateBlankCount + coordinateSingleValueCount
+        moreThanTwoValuesCount: coordinateMoreThanTwoValuesCount,
+        zeroValueCount: coordinateZeroValueCount,
+        totalCount:
+          coordinateBlankCount
+          + coordinateSingleValueCount
+          + coordinateMoreThanTwoValuesCount
+          + coordinateZeroValueCount
       },
       blockLevelBackgroundImageConflicts: blockLevelBackgroundImageConflicts.map((item) => ({
         blockName: item.blockName,
@@ -297,7 +314,9 @@ export const buildProcessedWorkbook = async (
         imageNames: item.imageNames,
         affectedRows: item.affectedRows
       })),
-      hasIssues: coordinateBlankCount + coordinateSingleValueCount > 0 || blockLevelBackgroundImageConflicts.length > 0,
+      hasIssues:
+        coordinateBlankCount + coordinateSingleValueCount + coordinateMoreThanTwoValuesCount + coordinateZeroValueCount > 0
+        || blockLevelBackgroundImageConflicts.length > 0,
       blocksWithMissingOrBlankLevel: Array.from(blocksWithMissingOrBlankLevelMap.entries())
         .map(([blockName, counts]) => ({
           blockName,
