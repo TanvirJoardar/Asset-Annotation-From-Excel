@@ -46,6 +46,25 @@ const getImageBaseName = (value: string): string => {
   return fileName.replace(/\.[^.]+$/, '') || 'missing-image';
 };
 
+const buildConflictKey = (blockName: string, levelName: string): string => `${blockName.toLowerCase()}|${levelName.toLowerCase()}`;
+
+const buildDefaultConflictSelections = (summary: ProcessingSummary): Record<string, string> => {
+  const selections: Record<string, string> = {};
+
+  for (const item of summary.blockLevelBackgroundImageConflicts) {
+    if (item.imageStats.length === 0) {
+      continue;
+    }
+
+    const bestImage = item.imageStats[0]?.imageName;
+    if (bestImage) {
+      selections[buildConflictKey(item.blockName, item.levelName)] = bestImage;
+    }
+  }
+
+  return selections;
+};
+
 const buildOutputPath = (block: string, level: string, imageNameOrPath: string): string => {
   const blockSafe = sanitizePathPart(block, 'missing-block');
   const levelSafe = sanitizePathPart(level, 'missing-level');
@@ -212,6 +231,7 @@ export function useAssetAnnotationWorkflow() {
   });
   const [showLevelIssueBlocks, setShowLevelIssueBlocks] = useState(false);
   const [showProcessingIssues, setShowProcessingIssues] = useState(false);
+  const [selectedConflictImageByKey, setSelectedConflictImageByKey] = useState<Record<string, string>>({});
   const [isProcessed, setIsProcessed] = useState(false);
   const [dataMap, setDataMap] = useState<Map<string, Annotation[]>>(new Map());
   const [imageHandles, setImageHandles] = useState<Map<string, AppFileHandle>>(new Map());
@@ -254,6 +274,7 @@ export function useAssetAnnotationWorkflow() {
     });
     setShowLevelIssueBlocks(false);
     setShowProcessingIssues(false);
+    setSelectedConflictImageByKey({});
     setIsProcessed(false);
     setDataMap(new Map());
     setImageHandles(new Map());
@@ -304,6 +325,7 @@ export function useAssetAnnotationWorkflow() {
       setProcessingSummary(processed.summary);
       setShowLevelIssueBlocks(false);
       setShowProcessingIssues(false);
+      setSelectedConflictImageByKey(buildDefaultConflictSelections(processed.summary));
       setExcelHandle(excelFileHandle);
       setAllImageFiles(imageFiles);
       setIsFileProcessed(true);
@@ -325,6 +347,55 @@ export function useAssetAnnotationWorkflow() {
 
     saveAs(processedWorkbookBlob, processedWorkbookName);
   }, [processedWorkbookBlob, processedWorkbookName]);
+
+  const setConflictImageSelection = useCallback((conflictKey: string, imageName: string) => {
+    setSelectedConflictImageByKey((prev) => ({
+      ...prev,
+      [conflictKey]: imageName
+    }));
+  }, []);
+
+  const applyConflictImageFixes = useCallback(async () => {
+    if (!directoryHandle) {
+      return;
+    }
+
+    let excelFileNode = excelHandle;
+    if (!excelFileNode) {
+      const discovered = await collectExcelAndImageHandles(directoryHandle);
+      excelFileNode = discovered.excelFileHandle;
+      if (excelFileNode) {
+        setExcelHandle(excelFileNode);
+      }
+    }
+
+    if (!excelFileNode) {
+      alert('No Excel or CSV file found in the chosen folder.');
+      return;
+    }
+
+    setIsFileProcessing(true);
+
+    try {
+      const inputFile = await excelFileNode.getFile();
+      const processed = await buildProcessedWorkbook(inputFile, deleteFirstRow, {
+        backgroundImageFixByBlockLevel: selectedConflictImageByKey
+      });
+
+      setProcessedWorkbookName(processed.outputName);
+      setProcessedWorkbookBlob(processed.outputBlob);
+      setProcessingSummary(processed.summary);
+      setSelectedConflictImageByKey(buildDefaultConflictSelections(processed.summary));
+
+      const fixedConflictsCount = processingSummary.blockLevelBackgroundImageConflicts.length - processed.summary.blockLevelBackgroundImageConflicts.length;
+      alert(`Applied image fixes. Resolved ${Math.max(0, fixedConflictsCount)} conflict(s).`);
+    } catch (e) {
+      console.error(e);
+      alert('Error while applying image fixes: ' + (e as Error).message);
+    } finally {
+      setIsFileProcessing(false);
+    }
+  }, [deleteFirstRow, directoryHandle, excelHandle, processingSummary.blockLevelBackgroundImageConflicts.length, selectedConflictImageByKey]);
 
   const startProcessing = useCallback(async () => {
     if (!directoryHandle) {
@@ -467,6 +538,9 @@ export function useAssetAnnotationWorkflow() {
     toggleLevelIssueBlocks,
     showProcessingIssues,
     toggleProcessingIssues,
+    selectedConflictImageByKey,
+    setConflictImageSelection,
+    applyConflictImageFixes,
     options,
     setOptions,
     isProcessing,

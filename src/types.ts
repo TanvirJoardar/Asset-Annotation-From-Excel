@@ -45,7 +45,10 @@ export interface ProcessingSummary {
   blockLevelBackgroundImageConflicts: Array<{
     blockName: string;
     levelName: string;
-    imageNames: string[];
+    imageStats: Array<{
+      imageName: string;
+      count: number;
+    }>;
     affectedRows: number;
   }>;
   hasIssues: boolean;

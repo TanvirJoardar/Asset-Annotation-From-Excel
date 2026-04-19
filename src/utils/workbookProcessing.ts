@@ -77,9 +77,14 @@ export interface ProcessedWorkbookResult {
   summary: ProcessingSummary;
 }
 
+interface ProcessWorkbookOptions {
+  backgroundImageFixByBlockLevel?: Record<string, string>;
+}
+
 export const buildProcessedWorkbook = async (
   inputFile: File,
-  deleteFirstRow: boolean
+  deleteFirstRow: boolean,
+  options: ProcessWorkbookOptions = {}
 ): Promise<ProcessedWorkbookResult> => {
   const inputBuffer = await inputFile.arrayBuffer();
   const workbook = XLSX.read(inputBuffer, { type: 'array' });
@@ -151,7 +156,7 @@ export const buildProcessedWorkbook = async (
   const blockLevelImageMap = new Map<string, {
     blockName: string;
     levelName: string;
-    imageNameMap: Map<string, string>;
+    imageNameMap: Map<string, { imageName: string; count: number }>;
     rowIndexes: number[];
   }>();
 
@@ -223,19 +228,28 @@ export const buildProcessedWorkbook = async (
     }
 
     if (colBackgroundImage !== -1) {
+      const conflictKey = `${block.toLowerCase()}|${level.toLowerCase()}`;
+      const selectedImageFix = options.backgroundImageFixByBlockLevel?.[conflictKey];
+      if (selectedImageFix && normalize(row[colBackgroundImage])) {
+        row[colBackgroundImage] = selectedImageFix;
+      }
+
       const imageName = normalize(row[colBackgroundImage]);
       if (imageName) {
-        const conflictKey = `${block.toLowerCase()}|${level.toLowerCase()}`;
         const existing = blockLevelImageMap.get(conflictKey) ?? {
           blockName: block,
           levelName: level,
-          imageNameMap: new Map<string, string>(),
-          rowIndexes: []
+          imageNameMap: new Map<string, { imageName: string; count: number }>(),
+          rowIndexes: [] as number[]
         };
 
         const imageKey = imageName.toLowerCase();
-        if (!existing.imageNameMap.has(imageKey)) {
-          existing.imageNameMap.set(imageKey, imageName);
+        const imageEntry = existing.imageNameMap.get(imageKey);
+        if (!imageEntry) {
+          existing.imageNameMap.set(imageKey, { imageName, count: 1 });
+        } else {
+          imageEntry.count += 1;
+          existing.imageNameMap.set(imageKey, imageEntry);
         }
         existing.rowIndexes.push(i);
         blockLevelImageMap.set(conflictKey, existing);
@@ -250,7 +264,12 @@ export const buildProcessedWorkbook = async (
     .map((entry) => ({
       blockName: entry.blockName,
       levelName: entry.levelName,
-      imageNames: Array.from(entry.imageNameMap.values()).sort((a, b) => a.localeCompare(b)),
+      imageStats: Array.from(entry.imageNameMap.values()).sort((a, b) => {
+        if (b.count !== a.count) {
+          return b.count - a.count;
+        }
+        return a.imageName.localeCompare(b.imageName);
+      }),
       affectedRows: entry.rowIndexes.length,
       rowIndexes: entry.rowIndexes
     }))
@@ -311,7 +330,7 @@ export const buildProcessedWorkbook = async (
       blockLevelBackgroundImageConflicts: blockLevelBackgroundImageConflicts.map((item) => ({
         blockName: item.blockName,
         levelName: item.levelName,
-        imageNames: item.imageNames,
+        imageStats: item.imageStats,
         affectedRows: item.affectedRows
       })),
       hasIssues:

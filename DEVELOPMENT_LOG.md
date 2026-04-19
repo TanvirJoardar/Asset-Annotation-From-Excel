@@ -172,6 +172,19 @@ This file tracks what has been developed in this project.
 
 ## 2026-04-17
 
+### Additional Update (Interactive Conflict Fix for Background Image Names)
+- Upgraded `Block/Level with Multiple Background Image Name Values` issues into a selectable fix workflow.
+- Each conflict now shows image capsules with occurrence counts.
+- Default selection is automatically set to the highest-count image for each `Block + Level` conflict.
+- Users can choose one capsule per conflict and click `Fix Selected`.
+- On fix:
+  - all rows in that conflict `Block + Level` with image values are replaced with the selected image name,
+  - processed workbook is rebuilt,
+  - the download file contains the applied fix.
+- Updated conflict summary model to include `imageStats` (`imageName`, `count`) for UI rendering and default selection.
+- Validation status:
+  - `npm run typecheck` passes
+
 ### Additional Update (Zero Count Includes Single Coordinate Value)
 - Fixed coordinate zero-value detection to include rows where only one numeric coordinate is present and that value is `0`.
 - Previous behavior only counted zero when a valid `x,y` pair existed.

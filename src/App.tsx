@@ -24,6 +24,9 @@ export default function App() {
     toggleLevelIssueBlocks,
     showProcessingIssues,
     toggleProcessingIssues,
+    selectedConflictImageByKey,
+    setConflictImageSelection,
+    applyConflictImageFixes,
     options,
     setOptions,
     isProcessing,
@@ -63,6 +66,9 @@ export default function App() {
             onToggleLevelIssueBlocks={toggleLevelIssueBlocks}
             showProcessingIssues={showProcessingIssues}
             onToggleProcessingIssues={toggleProcessingIssues}
+            selectedConflictImageByKey={selectedConflictImageByKey}
+            onSelectConflictImage={setConflictImageSelection}
+            onApplyConflictImageFixes={applyConflictImageFixes}
           />
 
           <ProcessingOptionsPanel

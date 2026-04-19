@@ -13,7 +13,12 @@ interface FileProcessingPanelProps {
   onToggleLevelIssueBlocks: () => void;
   showProcessingIssues: boolean;
   onToggleProcessingIssues: () => void;
+  selectedConflictImageByKey: Record<string, string>;
+  onSelectConflictImage: (conflictKey: string, imageName: string) => void;
+  onApplyConflictImageFixes: () => void | Promise<void>;
 }
+
+const buildConflictKey = (blockName: string, levelName: string): string => `${blockName.toLowerCase()}|${levelName.toLowerCase()}`;
 
 export default function FileProcessingPanel({
   deleteFirstRow,
@@ -26,7 +31,10 @@ export default function FileProcessingPanel({
   showLevelIssueBlocks,
   onToggleLevelIssueBlocks,
   showProcessingIssues,
-  onToggleProcessingIssues
+  onToggleProcessingIssues,
+  selectedConflictImageByKey,
+  onSelectConflictImage,
+  onApplyConflictImageFixes
 }: FileProcessingPanelProps) {
   const conflictCount = processingSummary.blockLevelBackgroundImageConflicts.length;
   const issueCount = processingSummary.coordinateIssues.totalCount + conflictCount;
@@ -175,7 +183,14 @@ export default function FileProcessingPanel({
           <section className="issue-section">
             <div className="issue-section-title-row">
               <h4 className="issue-section-title">Block/Level with Multiple Background Image Name Values</h4>
-              <span className="issue-count-capsule">{conflictCount} conflicts</span>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span className="issue-count-capsule">{conflictCount} conflicts</span>
+                {conflictCount > 0 && (
+                  <button type="button" className="btn btn-secondary issue-fix-btn" onClick={() => void onApplyConflictImageFixes()}>
+                    Fix Selected
+                  </button>
+                )}
+              </div>
             </div>
 
             {processingSummary.blockLevelBackgroundImageConflicts.length === 0 ? (
@@ -191,11 +206,23 @@ export default function FileProcessingPanel({
                     </div>
                     <p className="issue-image-label">Image Names</p>
                     <div className="issue-image-pills-wrap">
-                      {item.imageNames.map((name) => (
-                        <span key={name} className="issue-image-pill" title={name}>
-                          {name}
-                        </span>
-                      ))}
+                      {item.imageStats.map((imageInfo) => {
+                        const conflictKey = buildConflictKey(item.blockName, item.levelName);
+                        const isSelected = selectedConflictImageByKey[conflictKey] === imageInfo.imageName;
+
+                        return (
+                          <button
+                            key={imageInfo.imageName}
+                            type="button"
+                            className={`issue-image-pill selectable ${isSelected ? 'selected' : ''}`}
+                            title={`${imageInfo.imageName} (${imageInfo.count})`}
+                            onClick={() => onSelectConflictImage(conflictKey, imageInfo.imageName)}
+                          >
+                            <span className="issue-image-pill-name">{imageInfo.imageName}</span>
+                            <span className="issue-image-pill-count">{imageInfo.count}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </article>
                 ))}
