@@ -152,6 +152,7 @@ export const buildProcessedWorkbook = async (
   let coordinateSingleValueCount = 0;
   let coordinateMoreThanTwoValuesCount = 0;
   let coordinateZeroValueCount = 0;
+  const coordinateIssueRowIndexes: number[] = [];
   const blocksWithMissingOrBlankLevelMap = new Map<string, { missingCount: number; blankCount: number }>();
   const blockLevelImageMap = new Map<string, {
     blockName: string;
@@ -208,22 +209,31 @@ export const buildProcessedWorkbook = async (
 
     if (colCoordinates !== -1) {
       const coordinatesText = normalize(row[colCoordinates]);
+      let hasCoordinateIssue = false;
       if (!coordinatesText) {
         coordinateBlankCount++;
+        hasCoordinateIssue = true;
       } else {
         const parts = coordinatesText.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
         const numericParts = parts.filter((part) => isNumericValue(part));
         if (numericParts.length === 1) {
           coordinateSingleValueCount++;
+          hasCoordinateIssue = true;
         } else if (numericParts.length > 2) {
           coordinateMoreThanTwoValuesCount++;
+          hasCoordinateIssue = true;
         }
 
         const singleValueIsZero = numericParts.length === 1 && Number(numericParts[0]) === 0;
         const parsedCoordinate = parseCoordinates(coordinatesText);
         if (singleValueIsZero || (parsedCoordinate && (parsedCoordinate.x === 0 || parsedCoordinate.y === 0))) {
           coordinateZeroValueCount++;
+          hasCoordinateIssue = true;
         }
+      }
+
+      if (hasCoordinateIssue) {
+        coordinateIssueRowIndexes.push(i);
       }
     }
 
@@ -259,6 +269,29 @@ export const buildProcessedWorkbook = async (
 
   const outputSheet = XLSX.utils.aoa_to_sheet(updatedRows);
 
+  if (colCoordinates !== -1) {
+    for (const rowIndex of coordinateIssueRowIndexes) {
+      const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colCoordinates });
+      const cell = outputSheet[cellAddress];
+      if (!cell) {
+        continue;
+      }
+
+      cell.s = {
+        ...(cell.s ?? {}),
+        fill: {
+          patternType: 'solid',
+          fgColor: { rgb: 'FFFF4D4F' }
+        },
+        font: {
+          ...(cell.s?.font ?? {}),
+          color: { rgb: 'FFFFFFFF' },
+          bold: true
+        }
+      };
+    }
+  }
+
   const blockLevelBackgroundImageConflicts = Array.from(blockLevelImageMap.values())
     .filter((entry) => entry.imageNameMap.size > 1)
     .map((entry) => ({
@@ -274,29 +307,6 @@ export const buildProcessedWorkbook = async (
       rowIndexes: entry.rowIndexes
     }))
     .sort((a, b) => `${a.blockName}|${a.levelName}`.localeCompare(`${b.blockName}|${b.levelName}`));
-
-  if (colBackgroundImage !== -1) {
-    for (const conflict of blockLevelBackgroundImageConflicts) {
-      for (const rowIndex of conflict.rowIndexes) {
-        const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colBackgroundImage });
-        const cell = outputSheet[cellAddress];
-        if (!cell) {
-          continue;
-        }
-
-        cell.s = {
-          fill: {
-            patternType: 'solid',
-            fgColor: { rgb: 'FFFF4D4F' }
-          },
-          font: {
-            color: { rgb: 'FFFFFFFF' },
-            bold: true
-          }
-        };
-      }
-    }
-  }
 
   const outputWorkbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(outputWorkbook, outputSheet, firstSheetName || 'Sheet1');
@@ -357,6 +367,10 @@ export interface AnnotationExtractionResult {
   annotationsFound: number;
   invalidCoordsCount: number;
   invalidExamples: string[];
+  invalidCoordinates: Array<{
+    rowNumber: number;
+    coordinate: string;
+  }>;
   hasAnyLabelColumn: boolean;
 }
 
@@ -415,6 +429,7 @@ export const extractAnnotationsFromWorkbook = async (
   let annotationsFound = 0;
   let invalidCoordsCount = 0;
   const invalidExamples: string[] = [];
+  const invalidCoordinates: Array<{ rowNumber: number; coordinate: string }> = [];
 
   for (let i = headerRowIndex + 1; i < jsonRaw.length; i++) {
     const row = jsonRaw[i];
@@ -453,6 +468,10 @@ export const extractAnnotationsFromWorkbook = async (
 
     if (!parsed) {
       invalidCoordsCount++;
+      invalidCoordinates.push({
+        rowNumber: i + (deleteFirstRowOnAnnotation ? 2 : 1),
+        coordinate: normalize(coords)
+      });
       if (invalidExamples.length < 5) {
         invalidExamples.push(normalize(coords));
       }
@@ -483,6 +502,7 @@ export const extractAnnotationsFromWorkbook = async (
     annotationsFound,
     invalidCoordsCount,
     invalidExamples,
+    invalidCoordinates,
     hasAnyLabelColumn: colSensorId !== -1 || colDisplayName !== -1
   };
 };

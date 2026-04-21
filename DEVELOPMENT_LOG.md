@@ -2,6 +2,42 @@
 
 This file tracks what has been developed in this project.
 
+## 2026-04-21
+
+### Additional Update (Red Highlight for All Coordinate Issue Types)
+- Updated processed workbook generation to color `Coordinates` cells red for all coordinate issue categories:
+  - blank coordinates
+  - only one numeric value (only X or only Y)
+  - more than two numeric values
+  - parsed/derived zero value (`x=0` or `y=0`, including single `0`)
+- Replaced the previous single-condition row tracking with unified coordinate-issue row tracking.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Red Highlight for Single-Value Coordinates)
+- Updated processed workbook generation to color `Coordinates` cells red when only one numeric coordinate value is present (only X or only Y).
+- Styling uses red fill with white bold text to make incomplete coordinate entries obvious in the exported workbook.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Removed Red Conflict Cell Highlighting in Output Workbook)
+- Updated processed workbook generation to stop coloring `Background Image Name` conflict cells red.
+- Conflict detection and issue summaries remain active; only Excel cell styling for conflicts was removed.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Log All Invalid Coordinates with Row Numbers)
+- Added full invalid-coordinate capture during annotation extraction in src/utils/workbookProcessing.ts.
+- Each invalid entry now includes:
+  - Excel row number (1-based, aligned to the original worksheet row numbering)
+  - Original coordinate string value
+- Added console diagnostics in src/hooks/useAssetAnnotationWorkflow.ts:
+  - Emits a collapsed console group with invalid-row count.
+  - Prints all invalid rows using console.table for quick filtering/sorting.
+- Existing user alert remains unchanged and still shows a short example list.
+- Validation status:
+  - Not run (not requested)
+
 ## 2026-04-19
 
 ### Additional Update (Processing Row Count Inflation Fix)

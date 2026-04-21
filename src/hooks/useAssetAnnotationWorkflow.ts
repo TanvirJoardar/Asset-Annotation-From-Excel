@@ -501,6 +501,9 @@ export function useAssetAnnotationWorkflow() {
       setDataMap(nextDataMap);
 
       if (annotationData.invalidCoordsCount > 0) {
+        console.groupCollapsed(`[Coordinates] Annotation Invalid Rows: ${annotationData.invalidCoordsCount}`);
+        console.log(annotationData.invalidCoordinates);
+        console.groupEnd();
         alert(`${annotationData.invalidCoordsCount} rows had invalid coordinates and were skipped. Examples: ${annotationData.invalidExamples.join(', ')}`);
       }
 
