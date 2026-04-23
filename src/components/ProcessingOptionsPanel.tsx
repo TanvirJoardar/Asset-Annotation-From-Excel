@@ -266,13 +266,13 @@ export default function ProcessingOptionsPanel({
           onClick={() => void onStart()}
           disabled={isProcessing || (annotateFromProcessedFile && hasConflicts)}
         >
-          <span>
+          <span className="processing-start-inner">
             {isProcessing ? (
               <Loader2 size={20} className="animate-spin" />
             ) : (
               <Play size={18} fill="currentColor" />
             )}
-            {buttonLabel}
+            <span className="processing-start-label">{buttonLabel}</span>
           </span>
         </button>
       </div>

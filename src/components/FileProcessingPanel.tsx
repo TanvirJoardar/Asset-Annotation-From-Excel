@@ -134,30 +134,6 @@ export default function FileProcessingPanel({
         )}
       </div>
 
-      {/* Conflict Warning */}
-      {isFileProcessed && conflictCount > 0 && (
-        <div style={{
-          marginBottom: '1.5rem',
-          padding: '1rem 1.25rem',
-          borderRadius: 'var(--radius-lg)',
-          background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1))',
-          border: '1px solid rgba(251, 191, 36, 0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          animation: 'pulse-warning 2s ease-in-out infinite'
-        }}>
-          <AlertTriangle size={24} color="#fbbf24" style={{ flexShrink: 0 }} />
-          <div style={{ flex: 1 }}>
-            <strong style={{ color: '#fbbf24', fontSize: '0.95rem', fontWeight: 600 }}>
-              ⚠️ Action Required: {conflictCount} block-level background image conflict(s) detected
-            </strong>
-            <p style={{ color: '#fcd34d', fontSize: '0.9rem', margin: '0.25rem 0 0 0' }}>
-              Please resolve conflicts in the Processing Issues panel before starting annotation.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Success Status */}
       {isFileProcessed && conflictCount === 0 && issueCount === 0 && (
