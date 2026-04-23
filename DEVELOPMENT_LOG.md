@@ -2,6 +2,61 @@
 
 This file tracks what has been developed in this project.
 
+## 2026-04-23
+
+### Additional Update (Invalid Count Matches Excel Filtered Rows)
+- Updated coordinate processing summary to track a unique-row metric for blank/0 invalid coordinates.
+- Added `coordinateIssues.invalidRowCount` and used it in the Processing Issues modal.
+- `Invalid Count (X or Y is blank/0)` now counts each row once even if that row has multiple blank/0 issue tags.
+- Result: UI Invalid Count aligns with filtered row counts in processed Excel (`Issues` column).
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Coordinate Cell Highlighting Removed)
+- Removed processed-workbook red highlighting for `X Coords` and `Y Coords` cells.
+- Kept coordinate issue detection, summary counts, and `Issues` column output unchanged.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Processing Issues UI: Single Invalid Coordinate Count)
+- Updated `X/Y Coordinate Column Issues` section in the Processing Issues modal to show a single `Invalid Count` metric.
+- `Invalid Count` now uses UI-only calculation:
+  - `blankCount + singleValueCount + zeroValueCount`
+  - Interpreted as rows where X or Y is blank/0.
+- Removed previous multi-metric cards from this modal section (blank/single/multi/zero breakdown).
+- Did not change Issues column generation logic.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Issues Column Added After Y Coords)
+- Added a new `Issues` column in processed workbook output, inserted immediately after `Y Coords`.
+- `Issues` now stores semicolon-separated reason strings for coordinate rows colored red.
+- Updated reason strings to the requested filter categories:
+  - `both coordinates blank`
+  - `one coordinate blank`
+  - `both coordinates 0`
+  - `one coordinates 0`
+  - `X multiple values`
+  - `Y multiple values`
+- Updated classification logic to use only the above six categories for coordinate issue tagging.
+- Updated red cell highlighting to be per-cell:
+  - both coordinates blank/0 -> both `X Coords` and `Y Coords` are highlighted.
+  - one coordinate blank/0 -> only the affected coordinate cell is highlighted.
+- Existing coordinate summary metrics and red highlighting behavior remain active.
+- Validation status:
+  - `npm run typecheck` passes
+
+## 2026-04-22
+
+### Additional Update (Coordinate Source Switched to X Coords and Y Coords)
+- Updated workbook header detection to require `X Coords`, `Y Coords`, and `Background Image Name`.
+- Replaced all coordinate parsing paths that previously read from `Coordinates` with separate reads from `X Coords` and `Y Coords`.
+- Updated annotation extraction to build `(x, y)` only from `X Coords` and `Y Coords` and report invalid examples in `X: <value>, Y: <value>` format.
+- Updated workbook issue highlighting to mark both `X Coords` and `Y Coords` cells for rows with coordinate issues.
+- Updated processing UI wording and runtime alerts to reference X/Y coordinate columns.
+- Validation status:
+  - `npm run typecheck` passes
+
 ## 2026-04-21
 
 ### Additional Update (Red Highlight for All Coordinate Issue Types)
@@ -261,7 +316,7 @@ This file tracks what has been developed in this project.
   - `npm run typecheck` passes
 
 ### Additional Update (Interactive Conflict Fix for Background Image Names)
-- Upgraded `Block/Level with Multiple Background Image Name Values` issues into a selectable fix workflow.
+- Upgraded `Block-Level with Multiple Background Image Name Values` issues into a selectable fix workflow.
 - Each conflict now shows image capsules with occurrence counts.
 - Default selection is automatically set to the highest-count image for each `Block + Level` conflict.
 - Users can choose one capsule per conflict and click `Fix Selected`.

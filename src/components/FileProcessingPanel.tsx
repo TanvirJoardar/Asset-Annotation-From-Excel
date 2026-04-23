@@ -37,7 +37,8 @@ export default function FileProcessingPanel({
   onApplyConflictImageFixes
 }: FileProcessingPanelProps) {
   const conflictCount = processingSummary.blockLevelBackgroundImageConflicts.length;
-  const issueCount = processingSummary.coordinateIssues.totalCount + conflictCount;
+  const invalidCoordinateCount = processingSummary.coordinateIssues.invalidRowCount;
+  const issueCount = invalidCoordinateCount + conflictCount;
 
   return (
     <div className="glass-panel animate-fade-in" style={{ marginBottom: '1rem' }}>
@@ -87,8 +88,12 @@ export default function FileProcessingPanel({
             <span className="stat-value">{processingSummary.totalRows}</span>
           </div>
           <div className="stat-card">
+            <span className="stat-label">Rows With Unidentified Block</span>
+            <span className="stat-value">{processingSummary.missingBlock}</span>
+          </div>
+          <div className="stat-card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-              <span className="stat-label">Rows With Blank Block</span>
+              <span className="stat-label">Rows With Unidentified Level</span>
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -99,14 +104,10 @@ export default function FileProcessingPanel({
                 <Ellipsis size={16} />
               </button>
             </div>
-            <span className="stat-value">{processingSummary.missingBlock}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Rows With Missing/Blank Level</span>
             <span className="stat-value">{processingSummary.missingLevel}</span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Rows With Both Values</span>
+            <span className="stat-label">Rows With Both Block & Level</span>
             <span className="stat-value">{processingSummary.validBlockLevel}</span>
           </div>
         </div>
@@ -114,9 +115,9 @@ export default function FileProcessingPanel({
 
       {isFileProcessed && showLevelIssueBlocks && (
         <div className="glass-panel" style={{ marginTop: '1rem', padding: '1rem' }}>
-          <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Blocks With Missing/Blank Levels</h3>
+          <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Blocks With Unidentified Levels</h3>
           {processingSummary.blocksWithMissingOrBlankLevel.length === 0 ? (
-            <p style={{ color: 'var(--text-secondary)' }}>No blocks found with Missing/Blank levels.</p>
+            <p style={{ color: 'var(--text-secondary)' }}>No blocks found with Unidentified levels.</p>
           ) : (
             <div style={{ display: 'grid', gap: '0.5rem' }}>
               {processingSummary.blocksWithMissingOrBlankLevel.map((item) => (
@@ -159,30 +160,18 @@ export default function FileProcessingPanel({
           </div>
 
           <section className="issue-section">
-            <h4 className="issue-section-title">Coordinates Column Issues</h4>
+            <h4 className="issue-section-title">X/Y Coordinate Column Issues</h4>
             <div className="issue-metric-grid">
-              <div className="issue-metric-card blank">
-                <span className="issue-metric-label">Blank Coordinates</span>
-                <span className="issue-metric-value">{processingSummary.coordinateIssues.blankCount}</span>
-              </div>
-              <div className="issue-metric-card partial">
-                <span className="issue-metric-label">Only X or Y</span>
-                <span className="issue-metric-value">{processingSummary.coordinateIssues.singleValueCount}</span>
-              </div>
-              <div className="issue-metric-card multi">
-                <span className="issue-metric-label">More Than 2 Values</span>
-                <span className="issue-metric-value">{processingSummary.coordinateIssues.moreThanTwoValuesCount}</span>
-              </div>
               <div className="issue-metric-card zero">
-                <span className="issue-metric-label">X or Y Equals 0</span>
-                <span className="issue-metric-value">{processingSummary.coordinateIssues.zeroValueCount}</span>
+                <span className="issue-metric-label">Invalid Count (X or Y is blank/0)</span>
+                <span className="issue-metric-value">{invalidCoordinateCount}</span>
               </div>
             </div>
           </section>
 
           <section className="issue-section">
             <div className="issue-section-title-row">
-              <h4 className="issue-section-title">Block/Level with Multiple Background Image Name Values</h4>
+              <h4 className="issue-section-title">Block-Level with Multiple Background Image Name</h4>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="issue-count-capsule">{conflictCount} conflicts</span>
                 {conflictCount > 0 && (

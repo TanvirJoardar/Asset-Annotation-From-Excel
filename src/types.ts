@@ -40,6 +40,7 @@ export interface ProcessingSummary {
     singleValueCount: number;
     moreThanTwoValuesCount: number;
     zeroValueCount: number;
+    invalidRowCount: number;
     totalCount: number;
   };
   blockLevelBackgroundImageConflicts: Array<{

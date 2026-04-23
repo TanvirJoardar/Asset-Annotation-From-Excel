@@ -7,7 +7,7 @@ Built using native modern File System Access APIs, this platform keeps all of yo
 ### 🌟 Key Features
 
 - **Pure Local Execution**: Effortlessly process large directories filled with heavy `.png` assets entirely off-cloud.
-- **Intelligent Pattern Matching**: Automatically pulls "Sensor ID", "Coordinates", and "Background Image Name" columns and groups logic intuitively.
+- **Intelligent Pattern Matching**: Automatically pulls "Sensor ID", "X Coords", "Y Coords", and "Background Image Name" columns and groups logic intuitively.
 - **Dynamic Configuration UI**: Live control board to change outline properties, colors, toggle ID text labeling, and select structural markers using responsive HTML5 capabilities.
 - **Production-Ready DPI Output**: Configurable output parameters (e.g. `300 DPI` / `600 DPI`) bypassing generic `72 DPI` web-hooks, preserving crucial density formats utilizing embedded chunk writing.
 - **1-Click Packaging**: Automatically zips all annotated exports utilizing `jszip` without leaving the client viewer.

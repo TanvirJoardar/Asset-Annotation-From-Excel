@@ -260,6 +260,7 @@ export function useAssetAnnotationWorkflow() {
       singleValueCount: 0,
       moreThanTwoValuesCount: 0,
       zeroValueCount: 0,
+      invalidRowCount: 0,
       totalCount: 0
     },
     blockLevelBackgroundImageConflicts: [],
@@ -305,6 +306,7 @@ export function useAssetAnnotationWorkflow() {
         singleValueCount: 0,
         moreThanTwoValuesCount: 0,
         zeroValueCount: 0,
+        invalidRowCount: 0,
         totalCount: 0
       },
       blockLevelBackgroundImageConflicts: [],
@@ -501,10 +503,10 @@ export function useAssetAnnotationWorkflow() {
       setDataMap(nextDataMap);
 
       if (annotationData.invalidCoordsCount > 0) {
-        console.groupCollapsed(`[Coordinates] Annotation Invalid Rows: ${annotationData.invalidCoordsCount}`);
+        console.groupCollapsed(`[X/Y Coords] Annotation Invalid Rows: ${annotationData.invalidCoordsCount}`);
         console.log(annotationData.invalidCoordinates);
         console.groupEnd();
-        alert(`${annotationData.invalidCoordsCount} rows had invalid coordinates and were skipped. Examples: ${annotationData.invalidExamples.join(', ')}`);
+        alert(`${annotationData.invalidCoordsCount} rows had invalid X/Y coordinates and were skipped. Examples: ${annotationData.invalidExamples.join(', ')}`);
       }
 
       if (!annotationData.hasAnyLabelColumn) {

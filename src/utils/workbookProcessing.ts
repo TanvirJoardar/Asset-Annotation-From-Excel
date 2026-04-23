@@ -15,6 +15,26 @@ const isMissingOrBlank = (value: unknown): boolean => {
 
 const isNumericValue = (value: string): boolean => /^-?\d+(?:\.\d+)?$/.test(value);
 
+const normalizeHeaderKey = (value: unknown): string => normalize(value).toLowerCase().replace(/\s+/g, ' ');
+
+const isXCoordsHeader = (value: unknown): boolean => normalizeHeaderKey(value) === 'x coords';
+
+const isYCoordsHeader = (value: unknown): boolean => normalizeHeaderKey(value) === 'y coords';
+
+const toNumeric = (value: unknown): number | null => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const normalized = normalize(value);
+  if (!isNumericValue(normalized)) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const parseBlockAndLevel = (locationDescriptor: unknown): { block: string; level: string } => {
   const descriptorText = normalize(locationDescriptor);
   if (!descriptorText) {
@@ -41,14 +61,14 @@ const parseBlockAndLevel = (locationDescriptor: unknown): { block: string; level
   return { block, level };
 };
 
-const parseCoordinates = (coords: unknown): { x: number; y: number } | null => {
-  const coordsStr = normalize(coords);
-  const coordRegex = /^\s*-?\d+(?:\.\d+)?(?:\s+|,\s*)-?\d+(?:\.\d+)?\s*$/;
-  if (!coordRegex.test(coordsStr)) {
+const parseCoordinates = (xCoords: unknown, yCoords: unknown): { x: number; y: number } | null => {
+  const x = toNumeric(xCoords);
+  const y = toNumeric(yCoords);
+
+  if (x === null || y === null) {
     return null;
   }
 
-  const [x, y] = coordsStr.replace(',', ' ').split(/\s+/).map(Number);
   return { x, y };
 };
 
@@ -59,11 +79,14 @@ const findHeaderRow = (jsonRaw: unknown[][]): number => {
       continue;
     }
 
-    const lowered = row.map((cell) => normalize(cell).toLowerCase());
-    const hasCoordinates = lowered.includes('coordinates');
-    const hasBackground = lowered.includes('background image name') || lowered.includes('background image');
+    const hasXCoords = row.some((cell) => isXCoordsHeader(cell));
+    const hasYCoords = row.some((cell) => isYCoordsHeader(cell));
+    const hasBackground = row.some((cell) => {
+      const key = normalizeHeaderKey(cell);
+      return key === 'background image name' || key === 'background image';
+    });
 
-    if (hasCoordinates && hasBackground) {
+    if (hasXCoords && hasYCoords && hasBackground) {
       return i;
     }
   }
@@ -99,7 +122,7 @@ export const buildProcessedWorkbook = async (
 
   const headerRowIndex = findHeaderRow(jsonRaw);
   if (headerRowIndex === -1) {
-    throw new Error("Could not detect standard columns ('Coordinates', 'Background Image Name') in the spreadsheet.");
+    throw new Error("Could not detect standard columns ('X Coords', 'Y Coords', 'Background Image Name') in the spreadsheet.");
   }
 
   const updatedRows = jsonRaw.map((row) => (Array.isArray(row) ? [...row] : []));
@@ -110,7 +133,7 @@ export const buildProcessedWorkbook = async (
       idx,
       key: normalize(h).toLowerCase()
     }))
-    .filter((item) => item.key === 'block' || item.key === 'level' || item.key === 'processed block' || item.key === 'processed level')
+    .filter((item) => item.key === 'block' || item.key === 'level' || item.key === 'processed block' || item.key === 'processed level' || item.key === 'issues')
     .map((item) => item.idx)
     .sort((a, b) => b - a);
 
@@ -132,15 +155,31 @@ export const buildProcessedWorkbook = async (
     }
   }
 
-  const finalHeader = updatedRows[headerRowIndex] || [];
-  finalHeader[insertAt] = 'Processed Block';
-  finalHeader[insertAt + 1] = 'Processed Level';
+  const headerAfterProcessedColumns = updatedRows[headerRowIndex] || [];
+  headerAfterProcessedColumns[insertAt] = 'Processed Block';
+  headerAfterProcessedColumns[insertAt + 1] = 'Processed Level';
 
-  const colBlock = insertAt;
-  const colLevel = insertAt + 1;
-  const colCoordinates = finalHeader.findIndex((h) => normalize(h).toLowerCase() === 'coordinates');
+  const colYCoordsBeforeIssues = headerAfterProcessedColumns.findIndex((h) => isYCoordsHeader(h));
+  if (colYCoordsBeforeIssues !== -1) {
+    const issuesInsertAt = colYCoordsBeforeIssues + 1;
+    for (const row of updatedRows) {
+      if (Array.isArray(row)) {
+        row.splice(issuesInsertAt, 0, '');
+      }
+    }
+
+    const headerAfterIssuesColumn = updatedRows[headerRowIndex] || [];
+    headerAfterIssuesColumn[issuesInsertAt] = 'Issues';
+  }
+
+  const finalHeader = updatedRows[headerRowIndex] || [];
+  const colBlock = finalHeader.findIndex((h) => normalizeHeaderKey(h) === 'processed block');
+  const colLevel = finalHeader.findIndex((h) => normalizeHeaderKey(h) === 'processed level');
+  const colXCoords = finalHeader.findIndex((h) => isXCoordsHeader(h));
+  const colYCoords = finalHeader.findIndex((h) => isYCoordsHeader(h));
+  const colIssues = finalHeader.findIndex((h) => normalizeHeaderKey(h) === 'issues');
   const colBackgroundImage = finalHeader.findIndex((h) => {
-    const key = normalize(h).toLowerCase();
+    const key = normalizeHeaderKey(h);
     return key === 'background image name' || key === 'background image';
   });
 
@@ -152,7 +191,7 @@ export const buildProcessedWorkbook = async (
   let coordinateSingleValueCount = 0;
   let coordinateMoreThanTwoValuesCount = 0;
   let coordinateZeroValueCount = 0;
-  const coordinateIssueRowIndexes: number[] = [];
+  const coordinateInvalidBlankOrZeroRows = new Set<number>();
   const blocksWithMissingOrBlankLevelMap = new Map<string, { missingCount: number; blankCount: number }>();
   const blockLevelImageMap = new Map<string, {
     blockName: string;
@@ -207,33 +246,53 @@ export const buildProcessedWorkbook = async (
       validBlockLevel++;
     }
 
-    if (colCoordinates !== -1) {
-      const coordinatesText = normalize(row[colCoordinates]);
-      let hasCoordinateIssue = false;
-      if (!coordinatesText) {
+    if (colXCoords !== -1 && colYCoords !== -1) {
+      const xText = normalize(row[colXCoords]);
+      const yText = normalize(row[colYCoords]);
+      const xBlank = !xText;
+      const yBlank = !yText;
+      const xTokenCount = xText ? xText.replace(/,/g, ' ').split(/\s+/).filter(Boolean).length : 0;
+      const yTokenCount = yText ? yText.replace(/,/g, ' ').split(/\s+/).filter(Boolean).length : 0;
+      const xNumericValue = toNumeric(row[colXCoords]);
+      const yNumericValue = toNumeric(row[colYCoords]);
+      const coordinateIssues: string[] = [];
+
+      if (xBlank && yBlank) {
         coordinateBlankCount++;
-        hasCoordinateIssue = true;
+        coordinateInvalidBlankOrZeroRows.add(i);
+        coordinateIssues.push('both coordinates blank');
       } else {
-        const parts = coordinatesText.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
-        const numericParts = parts.filter((part) => isNumericValue(part));
-        if (numericParts.length === 1) {
+        if (xBlank !== yBlank) {
           coordinateSingleValueCount++;
-          hasCoordinateIssue = true;
-        } else if (numericParts.length > 2) {
-          coordinateMoreThanTwoValuesCount++;
-          hasCoordinateIssue = true;
+          coordinateInvalidBlankOrZeroRows.add(i);
+          coordinateIssues.push('one coordinate blank');
         }
 
-        const singleValueIsZero = numericParts.length === 1 && Number(numericParts[0]) === 0;
-        const parsedCoordinate = parseCoordinates(coordinatesText);
-        if (singleValueIsZero || (parsedCoordinate && (parsedCoordinate.x === 0 || parsedCoordinate.y === 0))) {
+        if (xTokenCount > 1) {
+          coordinateMoreThanTwoValuesCount++;
+          coordinateIssues.push('X multiple values');
+        }
+
+        if (yTokenCount > 1) {
+          coordinateMoreThanTwoValuesCount++;
+          coordinateIssues.push('Y multiple values');
+        }
+
+        const xIsZero = xNumericValue === 0;
+        const yIsZero = yNumericValue === 0;
+        if (xIsZero && yIsZero) {
           coordinateZeroValueCount++;
-          hasCoordinateIssue = true;
+          coordinateInvalidBlankOrZeroRows.add(i);
+          coordinateIssues.push('both coordinates 0');
+        } else if (xIsZero || yIsZero) {
+          coordinateZeroValueCount++;
+          coordinateInvalidBlankOrZeroRows.add(i);
+          coordinateIssues.push('one coordinates 0');
         }
       }
 
-      if (hasCoordinateIssue) {
-        coordinateIssueRowIndexes.push(i);
+      if (colIssues !== -1) {
+        row[colIssues] = coordinateIssues.join('; ');
       }
     }
 
@@ -268,29 +327,6 @@ export const buildProcessedWorkbook = async (
   }
 
   const outputSheet = XLSX.utils.aoa_to_sheet(updatedRows);
-
-  if (colCoordinates !== -1) {
-    for (const rowIndex of coordinateIssueRowIndexes) {
-      const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colCoordinates });
-      const cell = outputSheet[cellAddress];
-      if (!cell) {
-        continue;
-      }
-
-      cell.s = {
-        ...(cell.s ?? {}),
-        fill: {
-          patternType: 'solid',
-          fgColor: { rgb: 'FFFF4D4F' }
-        },
-        font: {
-          ...(cell.s?.font ?? {}),
-          color: { rgb: 'FFFFFFFF' },
-          bold: true
-        }
-      };
-    }
-  }
 
   const blockLevelBackgroundImageConflicts = Array.from(blockLevelImageMap.values())
     .filter((entry) => entry.imageNameMap.size > 1)
@@ -331,6 +367,7 @@ export const buildProcessedWorkbook = async (
         singleValueCount: coordinateSingleValueCount,
         moreThanTwoValuesCount: coordinateMoreThanTwoValuesCount,
         zeroValueCount: coordinateZeroValueCount,
+        invalidRowCount: coordinateInvalidBlankOrZeroRows.size,
         totalCount:
           coordinateBlankCount
           + coordinateSingleValueCount
@@ -391,13 +428,14 @@ export const extractAnnotationsFromWorkbook = async (
 
   const headerRowIndex = findHeaderRow(jsonRaw);
   if (headerRowIndex === -1) {
-    throw new Error("Could not detect standard columns ('Coordinates', 'Background Image Name') in the spreadsheet.");
+    throw new Error("Could not detect standard columns ('X Coords', 'Y Coords', 'Background Image Name') in the spreadsheet.");
   }
 
   const headers = jsonRaw[headerRowIndex] || [];
   const colSensorId = headers.findIndex((h) => normalize(h) === 'Sensor Id');
   const colDisplayName = headers.findIndex((h) => /display\s*name/i.test(normalize(h)));
-  const colCoords = headers.findIndex((h) => normalize(h) === 'Coordinates');
+  const colXCoords = headers.findIndex((h) => isXCoordsHeader(h));
+  const colYCoords = headers.findIndex((h) => isYCoordsHeader(h));
   const colImage = headers.findIndex((h) => {
     const key = normalize(h);
     return key === 'Background Image Name' || key === 'Background Image';
@@ -409,8 +447,11 @@ export const extractAnnotationsFromWorkbook = async (
   const colLocationDescriptor = headers.findIndex((h) => normalize(h).toLowerCase() === 'location descriptor');
 
   const missingCols: string[] = [];
-  if (colCoords === -1) {
-    missingCols.push('Coordinates');
+  if (colXCoords === -1) {
+    missingCols.push('X Coords');
+  }
+  if (colYCoords === -1) {
+    missingCols.push('Y Coords');
   }
   if (colImage === -1) {
     missingCols.push('Background Image Name');
@@ -439,15 +480,16 @@ export const extractAnnotationsFromWorkbook = async (
 
     const sensorId = normalize(row[colSensorId]);
     const sensorDisplayName = colDisplayName !== -1 ? normalize(row[colDisplayName]) : '';
-    const coords = row[colCoords];
+    const xCoords = row[colXCoords];
+    const yCoords = row[colYCoords];
     const imageName = row[colImage];
 
-    if (!coords || !imageName) {
+    if ((!normalize(xCoords) && !normalize(yCoords)) || !imageName) {
       continue;
     }
 
     const cleanedImageName = normalize(imageName);
-    const parsed = parseCoordinates(coords);
+    const parsed = parseCoordinates(xCoords, yCoords);
 
     const descriptor = colLocationDescriptor !== -1 ? row[colLocationDescriptor] : '';
     const parsedFromDescriptor = parseBlockAndLevel(descriptor);
@@ -470,10 +512,10 @@ export const extractAnnotationsFromWorkbook = async (
       invalidCoordsCount++;
       invalidCoordinates.push({
         rowNumber: i + (deleteFirstRowOnAnnotation ? 2 : 1),
-        coordinate: normalize(coords)
+        coordinate: `X: ${normalize(xCoords)}, Y: ${normalize(yCoords)}`
       });
       if (invalidExamples.length < 5) {
-        invalidExamples.push(normalize(coords));
+        invalidExamples.push(`X: ${normalize(xCoords)}, Y: ${normalize(yCoords)}`);
       }
       continue;
     }
