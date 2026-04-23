@@ -195,7 +195,7 @@ const drawCirclesOnImage = async (
           ? (ann.displayName || ann.id || '')
           : (ann.id || ann.displayName || '');
         ctx.font = `bold ${textSize}px Inter`;
-        ctx.fillStyle = options.color;
+        ctx.fillStyle = options.labelColor;
         ctx.fillText(labelText, x + radius + 5, y + 5);
       }
     }
@@ -280,6 +280,7 @@ export function useAssetAnnotationWorkflow() {
 
   const [options, setOptions] = useState<RenderOptions>({
     color: '#ef4444',
+    labelColor: '#f8fafc',
     drawText: true,
     radius: 15,
     dpi: 300,

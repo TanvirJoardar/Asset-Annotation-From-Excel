@@ -2,6 +2,7 @@ export type LabelType = 'displayName' | 'sensorId';
 
 export interface RenderOptions {
   color: string;
+  labelColor: string;
   drawText: boolean;
   radius: number;
   dpi: number;

@@ -1,4 +1,4 @@
-import { Ellipsis } from 'lucide-react';
+import { Ellipsis, FileSpreadsheet, Download, AlertCircle, CheckCircle2, TrendingUp, AlertTriangle, Layers, CheckSquare, Loader2 } from 'lucide-react';
 import type { ProcessingSummary } from '../types';
 
 interface FileProcessingPanelProps {
@@ -37,70 +37,283 @@ export default function FileProcessingPanel({
   const issueCount = invalidCoordinateCount + conflictCount;
 
   return (
-    <div className="glass-panel animate-fade-in" style={{ marginBottom: '1rem' }}>
-      <h2 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>File Processing (Optional)</h2>
-      <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-        You can process the file to generate Processed Block and Processed Level columns, or start annotation directly.
-      </p>
+    <div className="glass-panel animate-fade-in" style={{ padding: '2.5rem', marginBottom: '1.5rem' }}>
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <div style={{
+          width: '64px',
+          height: '64px',
+          margin: '0 auto 1rem',
+          borderRadius: 'var(--radius-xl)',
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.1))',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#8b5cf6'
+        }}>
+          <FileSpreadsheet size={32} />
+        </div>
+        <h2 style={{ 
+          fontSize: '1.75rem', 
+          marginBottom: '0.75rem',
+          background: 'linear-gradient(135deg, #f8fafc 0%, #c4b5fd 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          fontWeight: 700
+        }}>
+          File Processing
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', maxWidth: '600px', margin: '0 auto' }}>
+          Enhance your Excel file with Processed Block and Processed Level columns for better annotation accuracy
+        </p>
+      </div>
 
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <button className="btn btn-primary" onClick={() => void onProcessFile()} disabled={isFileProcessing}>
-          {isFileProcessing ? 'Processing File...' : (isFileProcessed ? 'Reprocess Excel File' : 'Process Excel File')}
+      {/* Action Buttons */}
+      <div style={{ 
+        display: 'flex', 
+        gap: '1rem', 
+        flexWrap: 'wrap', 
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: '1.5rem'
+      }}>
+        <button 
+          className="btn btn-primary" 
+          onClick={() => void onProcessFile()} 
+          disabled={isFileProcessing}
+          style={{
+            padding: '1rem 2rem',
+            fontSize: '1.05rem',
+            fontWeight: 600,
+            minWidth: '220px'
+          }}
+        >
+          {isFileProcessing ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Loader2 size={20} className="animate-spin" />
+              Processing...
+            </span>
+          ) : (
+            isFileProcessed ? 'Reprocess Excel File' : 'Process Excel File'
+          )}
         </button>
 
         {isFileProcessed && (
-          <button className="btn btn-secondary" onClick={onDownloadProcessedFile}>
-            Download Processed File
-          </button>
-        )}
+          <>
+            <button 
+              className="btn btn-secondary" 
+              onClick={onDownloadProcessedFile}
+              style={{
+                padding: '1rem 1.5rem',
+                fontSize: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <Download size={20} />
+              Download Processed File
+            </button>
 
-        {isFileProcessed && (
-          <button
-            type="button"
-            className={`issue-status-btn ${processingSummary.hasIssues ? 'has-issues' : 'no-issues'}`}
-            onClick={onToggleProcessingIssues}
-            title="Show processing issue details"
-          >
-            <span className="issue-status-dot" aria-hidden="true" />
-            {processingSummary.hasIssues ? `Issues (${issueCount})` : 'No Issues'}
-          </button>
+            <button
+              type="button"
+              className={`issue-status-btn ${processingSummary.hasIssues ? 'has-issues' : 'no-issues'}`}
+              onClick={onToggleProcessingIssues}
+              title="Show processing issue details"
+              style={{
+                padding: '0.75rem 1.25rem',
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                marginLeft: 'auto'
+              }}
+            >
+              <span className="issue-status-dot" aria-hidden="true" />
+              {processingSummary.hasIssues ? `Issues (${issueCount})` : 'No Issues'}
+            </button>
+          </>
         )}
       </div>
 
-      {/* {isFileProcessed && conflictCount > 0 && (
-        <div className="alert alert-warning" style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '0.5rem', backgroundColor: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', color: '#fbbf24' }}>
-          <strong>⚠️ Action Required:</strong> {conflictCount} block-level background image conflict(s) detected. Please resolve conflicts in the Processing Issues panel before starting annotation.
+      {/* Conflict Warning */}
+      {isFileProcessed && conflictCount > 0 && (
+        <div style={{
+          marginBottom: '1.5rem',
+          padding: '1rem 1.25rem',
+          borderRadius: 'var(--radius-lg)',
+          background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1))',
+          border: '1px solid rgba(251, 191, 36, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          animation: 'pulse-warning 2s ease-in-out infinite'
+        }}>
+          <AlertTriangle size={24} color="#fbbf24" style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <strong style={{ color: '#fbbf24', fontSize: '0.95rem', fontWeight: 600 }}>
+              ⚠️ Action Required: {conflictCount} block-level background image conflict(s) detected
+            </strong>
+            <p style={{ color: '#fcd34d', fontSize: '0.9rem', margin: '0.25rem 0 0 0' }}>
+              Please resolve conflicts in the Processing Issues panel before starting annotation.
+            </p>
+          </div>
         </div>
-      )} */}
+      )}
 
+      {/* Success Status */}
+      {isFileProcessed && conflictCount === 0 && issueCount === 0 && (
+        <div style={{
+          marginBottom: '1.5rem',
+          padding: '1rem 1.25rem',
+          borderRadius: 'var(--radius-lg)',
+          background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.1))',
+          border: '1px solid rgba(34, 197, 94, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}>
+          <CheckCircle2 size={24} color="#4ade80" style={{ flexShrink: 0 }} />
+          <div>
+            <strong style={{ color: '#4ade80', fontSize: '0.95rem', fontWeight: 600 }}>Processing Complete</strong>
+            <p style={{ color: '#86efac', fontSize: '0.9rem', margin: '0.25rem 0 0 0' }}>
+              File processed successfully with no issues detected.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Grid */}
       {isFileProcessed && (
-        <div className="stats-grid" style={{ marginTop: '1.5rem' }}>
-          <div className="stat-card">
-            <span className="stat-label">Rows Evaluated</span>
-            <span className="stat-value">{processingSummary.totalRows}</span>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
+          gap: '1.25rem',
+          marginTop: '2rem'
+        }}>
+          {/* Total Rows */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05))',
+            border: '1px solid rgba(59, 130, 246, 0.2)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem',
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: 'var(--radius-md)',
+                background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#3b82f6'
+              }}>
+                <TrendingUp size={18} />
+              </div>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Rows Evaluated</span>
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #60a5fa, #3b82f6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              {processingSummary.totalRows}
+            </div>
           </div>
-          <div className="stat-card">
-            <span className="stat-label">Rows With Unidentified Block</span>
-            <span className="stat-value">{processingSummary.missingBlock}</span>
+
+          {/* Missing Block */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05))',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem',
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: 'var(--radius-md)',
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444'
+              }}>
+                <AlertCircle size={18} />
+              </div>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unidentified Block</span>
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #f87171, #ef4444)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              {processingSummary.missingBlock}
+            </div>
           </div>
-          <div className="stat-card">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-              <span className="stat-label">Rows With Unidentified Level</span>
+
+          {/* Missing Level */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(234, 88, 12, 0.05))',
+            border: '1px solid rgba(245, 158, 11, 0.2)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem',
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#f59e0b'
+                }}>
+                  <Layers size={18} />
+                </div>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unidentified Level</span>
+              </div>
               <button
                 type="button"
                 className="btn btn-secondary"
                 onClick={onToggleLevelIssueBlocks}
-                style={{ padding: '0.25rem 0.5rem', minWidth: 'unset' }}
+                style={{ 
+                  padding: '0.5rem', 
+                  minWidth: 'unset',
+                  borderRadius: 'var(--radius-sm)'
+                }}
                 title="Show block names where level is Missing/Blank"
               >
                 <Ellipsis size={16} />
               </button>
             </div>
-            <span className="stat-value">{processingSummary.missingLevel}</span>
+            <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              {processingSummary.missingLevel}
+            </div>
           </div>
-          <div className="stat-card">
-            <span className="stat-label">Rows With Both Block & Level</span>
-            <span className="stat-value">{processingSummary.validBlockLevel}</span>
+
+          {/* Valid Block Level */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05))',
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem',
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: 'var(--radius-md)',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#10b981'
+              }}>
+                <CheckSquare size={18} />
+              </div>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Block & Level Valid</span>
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #34d399, #10b981)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              {processingSummary.validBlockLevel}
+            </div>
           </div>
         </div>
       )}

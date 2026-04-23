@@ -68,7 +68,7 @@ function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps)
               ? (ann.displayName || ann.id || '')
               : (ann.id || ann.displayName || '');
             ctx.font = `bold ${textSize}px Arial`;
-            ctx.fillStyle = options.color;
+            ctx.fillStyle = options.labelColor;
             ctx.fillText(labelText, x + radius + 5, y + 5);
           }
         }
