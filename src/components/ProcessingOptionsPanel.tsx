@@ -6,18 +6,18 @@ interface ProcessingOptionsPanelProps {
   options: RenderOptions;
   setOptions: Dispatch<SetStateAction<RenderOptions>>;
   isProcessing: boolean;
+  annotateFromProcessedFile: boolean;
+  hasConflicts: boolean;
   onStart: () => void | Promise<void>;
-  deleteFirstRowOnAnnotation: boolean;
-  setDeleteFirstRowOnAnnotation: Dispatch<SetStateAction<boolean>>;
 }
 
 export default function ProcessingOptionsPanel({
   options,
   setOptions,
   isProcessing,
-  onStart,
-  deleteFirstRowOnAnnotation,
-  setDeleteFirstRowOnAnnotation
+  annotateFromProcessedFile,
+  hasConflicts,
+  onStart
 }: ProcessingOptionsPanelProps) {
   return (
     <div className="glass-panel text-center animate-fade-in">
@@ -81,25 +81,22 @@ export default function ProcessingOptionsPanel({
           </select>
         </div>
 
-        <div className="option-group checkbox-group">
-          <input
-            type="checkbox"
-            id="deleteFirstRowOnAnnotation"
-            checked={deleteFirstRowOnAnnotation}
-            onChange={(e) => setDeleteFirstRowOnAnnotation(e.target.checked)}
-          />
-          <label htmlFor="deleteFirstRowOnAnnotation">Remove first row before annotation</label>
-        </div>
       </div>
+
+      {annotateFromProcessedFile && hasConflicts && (
+        <div className="alert alert-warning" style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: '0.5rem', backgroundColor: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', color: '#fbbf24' }}>
+          <strong>⚠️ Conflicts Detected:</strong> Please resolve Block-Level background image conflicts in the Processing Issues panel before starting annotation.
+        </div>
+      )}
 
       <button
         className="btn btn-primary"
         onClick={() => void onStart()}
-        disabled={isProcessing}
+        disabled={isProcessing || (annotateFromProcessedFile && hasConflicts)}
         style={{ width: '100%', maxWidth: '300px', fontSize: '1.2rem', padding: '1rem' }}
       >
         {isProcessing ? <Loader2 size={24} className="animate-spin" /> : <Play size={24} />}
-        {isProcessing ? 'Processing...' : 'Start Annotation'}
+        {isProcessing ? 'Processing...' : (annotateFromProcessedFile ? (hasConflicts ? 'Resolve Conflicts First' : 'Start Annotation from Processed File') : 'Start Annotation')}
       </button>
     </div>
   );

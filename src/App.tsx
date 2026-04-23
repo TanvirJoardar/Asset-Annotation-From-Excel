@@ -13,8 +13,6 @@ export default function App() {
   const {
     directoryHandle,
     isProcessed,
-    deleteFirstRow,
-    setDeleteFirstRow,
     isFileProcessing,
     isFileProcessed,
     processSiteFile,
@@ -31,8 +29,7 @@ export default function App() {
     setOptions,
     isProcessing,
     startProcessing,
-    deleteFirstRowOnAnnotation,
-    setDeleteFirstRowOnAnnotation,
+    annotateFromProcessedFile,
     stats,
     dataMap,
     imageHandles,
@@ -57,8 +54,6 @@ export default function App() {
       {directoryHandle && !isProcessed && (
         <>
           <FileProcessingPanel
-            deleteFirstRow={deleteFirstRow}
-            onToggleDeleteFirstRow={setDeleteFirstRow}
             isFileProcessing={isFileProcessing}
             isFileProcessed={isFileProcessed}
             onProcessFile={processSiteFile}
@@ -77,9 +72,9 @@ export default function App() {
             options={options}
             setOptions={setOptions}
             isProcessing={isProcessing}
+            annotateFromProcessedFile={annotateFromProcessedFile}
+            hasConflicts={processingSummary.blockLevelBackgroundImageConflicts.length > 0}
             onStart={startProcessing}
-            deleteFirstRowOnAnnotation={deleteFirstRowOnAnnotation}
-            setDeleteFirstRowOnAnnotation={setDeleteFirstRowOnAnnotation}
           />
         </>
       )}

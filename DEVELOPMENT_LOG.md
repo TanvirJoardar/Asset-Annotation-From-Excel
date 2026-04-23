@@ -4,6 +4,62 @@ This file tracks what has been developed in this project.
 
 ## 2026-04-23
 
+### Additional Update (Block Annotation When Conflicts Exist)
+- Implemented safety block to prevent annotation from processed file when block-level background image conflicts exist:
+  - Added validation in `startProcessing()` hook to check `processingSummary.blockLevelBackgroundImageConflicts.length > 0`
+  - When conflicts detected and user attempts annotation from processed file, shows alert and blocks execution
+  - Updated `ProcessingOptionsPanel` to accept `hasConflicts` prop
+  - Added warning alert in `ProcessingOptionsPanel` when conflicts exist and processed file annotation is active
+  - Updated Start Annotation button to show "Resolve Conflicts First" when conflicts block annotation
+  - Button is disabled when `annotateFromProcessedFile && hasConflicts` is true
+  - Added warning status message in `FileProcessingPanel` below action buttons when conflicts exist
+  - Message directs user to resolve conflicts in Processing Issues panel before annotation
+- User flow:
+  1. User processes file -> conflicts detected
+  2. "Start Annotation from Processed File" button changes to "Resolve Conflicts First" (disabled)
+  3. Warning message appears in both File Processing panel and Processing Options panel
+  4. User must open Processing Issues panel and use "Fix Selected" to resolve conflicts
+  5. After conflicts resolved, annotation button becomes enabled
+- Validation status:
+  - `npm run typecheck` passes
+  - No TypeScript errors
+
+### Additional Update (Annotation Uses Processed File After File Processing)
+- Updated annotation source selection flow:
+  - If file processing has been completed, annotation reads from the in-memory processed workbook file.
+  - Otherwise, annotation reads from the original Excel file in the selected directory.
+- Updated annotation action button text dynamically:
+  - `Start Annotation from Processed File` after successful file processing.
+  - `Start Annotation` when processing has not been run.
+- Updated processing button text to `Reprocess Excel File` after initial processing.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Preserve Grouped Header Formatting in Processed Download)
+- Updated processed workbook generation to preserve row 1 grouped-header formatting and row 2 header colors.
+- Carried source cell styles through column removals/insertions for header rows before writing the output sheet.
+- Preserved transformed worksheet merge ranges so grouped header structure remains intact after output column changes.
+- Enabled style-aware workbook reading (`cellStyles: true`) so header/background color styles are available and retained in output.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Always Use 2nd Row as Header)
+- Removed header-selection checkboxes from both File Processing and Annotation settings UI.
+- Updated logic to always treat row 2 as the header in all processing paths.
+- File content is kept unchanged (no row deletion).
+- Added explicit errors when row 2 does not contain required headers.
+- Validation status:
+  - `npm run typecheck` passes
+
+### Additional Update (Keep First Row, Use 2nd Row as Header)
+- Updated workbook processing to keep all original rows unchanged (no first-row deletion).
+- When enabled, the processing checkbox now treats row 2 as header instead of deleting row 1.
+- Applied the same behavior to annotation extraction: row 2 can be used as header while preserving row 1 in source data.
+- Updated related checkbox labels in processing and annotation panels to reflect the new behavior.
+- Updated annotation invalid-row numbering to stay aligned with the original worksheet row numbers.
+- Validation status:
+  - `npm run typecheck` passes
+
 ### Additional Update (Invalid Count Matches Excel Filtered Rows)
 - Updated coordinate processing summary to track a unique-row metric for blank/0 invalid coordinates.
 - Added `coordinateIssues.invalidRowCount` and used it in the Processing Issues modal.

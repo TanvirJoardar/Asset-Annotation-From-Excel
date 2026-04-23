@@ -2,8 +2,6 @@ import { Ellipsis } from 'lucide-react';
 import type { ProcessingSummary } from '../types';
 
 interface FileProcessingPanelProps {
-  deleteFirstRow: boolean;
-  onToggleDeleteFirstRow: (checked: boolean) => void;
   isFileProcessing: boolean;
   isFileProcessed: boolean;
   onProcessFile: () => void | Promise<void>;
@@ -21,8 +19,6 @@ interface FileProcessingPanelProps {
 const buildConflictKey = (blockName: string, levelName: string): string => `${blockName.toLowerCase()}|${levelName.toLowerCase()}`;
 
 export default function FileProcessingPanel({
-  deleteFirstRow,
-  onToggleDeleteFirstRow,
   isFileProcessing,
   isFileProcessed,
   onProcessFile,
@@ -47,19 +43,9 @@ export default function FileProcessingPanel({
         You can process the file to generate Processed Block and Processed Level columns, or start annotation directly.
       </p>
 
-      <div className="option-group checkbox-group" style={{ marginBottom: '1rem' }}>
-        <input
-          type="checkbox"
-          id="deleteFirstRow"
-          checked={deleteFirstRow}
-          onChange={(event) => onToggleDeleteFirstRow(event.target.checked)}
-        />
-        <label htmlFor="deleteFirstRow">Delete first row before processing</label>
-      </div>
-
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="btn btn-primary" onClick={() => void onProcessFile()} disabled={isFileProcessing}>
-          {isFileProcessing ? 'Processing File...' : (isFileProcessed ? 'Reprocess File' : 'Process Excel File')}
+          {isFileProcessing ? 'Processing File...' : (isFileProcessed ? 'Reprocess Excel File' : 'Process Excel File')}
         </button>
 
         {isFileProcessed && (
@@ -80,6 +66,12 @@ export default function FileProcessingPanel({
           </button>
         )}
       </div>
+
+      {/* {isFileProcessed && conflictCount > 0 && (
+        <div className="alert alert-warning" style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '0.5rem', backgroundColor: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', color: '#fbbf24' }}>
+          <strong>⚠️ Action Required:</strong> {conflictCount} block-level background image conflict(s) detected. Please resolve conflicts in the Processing Issues panel before starting annotation.
+        </div>
+      )} */}
 
       {isFileProcessed && (
         <div className="stats-grid" style={{ marginTop: '1.5rem' }}>

@@ -94,6 +94,28 @@ const findHeaderRow = (jsonRaw: unknown[][]): number => {
   return -1;
 };
 
+const resolveHeaderRowIndex = (rows: unknown[][]): number => {
+  return rows.length > 1 ? 1 : -1;
+};
+
+const cloneStyle = (style: unknown): unknown => {
+  if (!style) {
+    return undefined;
+  }
+
+  return JSON.parse(JSON.stringify(style));
+};
+
+const getCellStyle = (sheet: XLSX.WorkSheet, rowIndex: number, colIndex: number): unknown => {
+  const address = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+  const cell = sheet[address] as (XLSX.CellObject & { s?: unknown }) | undefined;
+  return cloneStyle(cell?.s);
+};
+
+const pickAdjacentStyle = (rowStyles: unknown[], index: number): unknown => {
+  return cloneStyle(rowStyles[index - 1] ?? rowStyles[index + 1]);
+};
+
 export interface ProcessedWorkbookResult {
   outputBlob: Blob;
   outputName: string;
@@ -106,26 +128,30 @@ interface ProcessWorkbookOptions {
 
 export const buildProcessedWorkbook = async (
   inputFile: File,
-  deleteFirstRow: boolean,
   options: ProcessWorkbookOptions = {}
 ): Promise<ProcessedWorkbookResult> => {
   const inputBuffer = await inputFile.arrayBuffer();
-  const workbook = XLSX.read(inputBuffer, { type: 'array' });
+  const workbook = XLSX.read(inputBuffer, { type: 'array', cellStyles: true });
   const firstSheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[firstSheetName];
   const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as unknown[][];
-  const jsonRaw = deleteFirstRow ? rawRows.slice(1) : rawRows;
+  const jsonRaw = rawRows;
 
   if (jsonRaw.length === 0) {
     throw new Error('No data rows available after applying row deletion option.');
   }
 
-  const headerRowIndex = findHeaderRow(jsonRaw);
+  const headerRowIndex = resolveHeaderRowIndex(jsonRaw);
   if (headerRowIndex === -1) {
-    throw new Error("Could not detect standard columns ('X Coords', 'Y Coords', 'Background Image Name') in the spreadsheet.");
+    throw new Error("Could not use second row as header. Ensure row 2 contains 'X Coords', 'Y Coords', and 'Background Image Name'.");
   }
 
   const updatedRows = jsonRaw.map((row) => (Array.isArray(row) ? [...row] : []));
+  const updatedStyles = jsonRaw.map((row, rowIndex) => (
+    Array.isArray(row)
+      ? row.map((_, colIndex) => getCellStyle(worksheet, rowIndex, colIndex))
+      : []
+  ));
   const headerRow = updatedRows[headerRowIndex] || [];
 
   const columnsToRemove = headerRow
@@ -138,9 +164,12 @@ export const buildProcessedWorkbook = async (
     .sort((a, b) => b - a);
 
   for (const colIndex of columnsToRemove) {
-    for (const row of updatedRows) {
+    for (let rowIndex = 0; rowIndex < updatedRows.length; rowIndex++) {
+      const row = updatedRows[rowIndex];
+      const styleRow = updatedStyles[rowIndex];
       if (Array.isArray(row) && row.length > colIndex) {
         row.splice(colIndex, 1);
+        styleRow.splice(colIndex, 1);
       }
     }
   }
@@ -149,27 +178,39 @@ export const buildProcessedWorkbook = async (
   const colLocationDescriptor = normalizedHeader.findIndex((h) => normalize(h).toLowerCase() === 'location descriptor');
   const insertAt = colLocationDescriptor === -1 ? normalizedHeader.length : colLocationDescriptor + 1;
 
-  for (const row of updatedRows) {
+  for (let rowIndex = 0; rowIndex < updatedRows.length; rowIndex++) {
+    const row = updatedRows[rowIndex];
+    const styleRow = updatedStyles[rowIndex];
     if (Array.isArray(row)) {
       row.splice(insertAt, 0, '', '');
+      styleRow.splice(insertAt, 0, undefined, undefined);
     }
   }
 
   const headerAfterProcessedColumns = updatedRows[headerRowIndex] || [];
+  const headerStylesAfterProcessedColumns = updatedStyles[headerRowIndex] || [];
   headerAfterProcessedColumns[insertAt] = 'Processed Block';
   headerAfterProcessedColumns[insertAt + 1] = 'Processed Level';
+  headerStylesAfterProcessedColumns[insertAt] = pickAdjacentStyle(headerStylesAfterProcessedColumns, insertAt);
+  headerStylesAfterProcessedColumns[insertAt + 1] = pickAdjacentStyle(headerStylesAfterProcessedColumns, insertAt + 1);
 
   const colYCoordsBeforeIssues = headerAfterProcessedColumns.findIndex((h) => isYCoordsHeader(h));
+  let issuesInsertAt = -1;
   if (colYCoordsBeforeIssues !== -1) {
-    const issuesInsertAt = colYCoordsBeforeIssues + 1;
-    for (const row of updatedRows) {
+    issuesInsertAt = colYCoordsBeforeIssues + 1;
+    for (let rowIndex = 0; rowIndex < updatedRows.length; rowIndex++) {
+      const row = updatedRows[rowIndex];
+      const styleRow = updatedStyles[rowIndex];
       if (Array.isArray(row)) {
         row.splice(issuesInsertAt, 0, '');
+        styleRow.splice(issuesInsertAt, 0, undefined);
       }
     }
 
     const headerAfterIssuesColumn = updatedRows[headerRowIndex] || [];
+    const headerStylesAfterIssuesColumn = updatedStyles[headerRowIndex] || [];
     headerAfterIssuesColumn[issuesInsertAt] = 'Issues';
+    headerStylesAfterIssuesColumn[issuesInsertAt] = pickAdjacentStyle(headerStylesAfterIssuesColumn, issuesInsertAt);
   }
 
   const finalHeader = updatedRows[headerRowIndex] || [];
@@ -328,6 +369,78 @@ export const buildProcessedWorkbook = async (
 
   const outputSheet = XLSX.utils.aoa_to_sheet(updatedRows);
 
+  // Preserve first-row grouped header formatting and second-row header colors.
+  for (const rowIndex of [0, headerRowIndex]) {
+    const row = updatedRows[rowIndex] || [];
+    const styleRow = updatedStyles[rowIndex] || [];
+
+    for (let colIndex = 0; colIndex < styleRow.length; colIndex++) {
+      const style = styleRow[colIndex];
+      if (!style) {
+        continue;
+      }
+
+      const address = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+      const existing = outputSheet[address] as (XLSX.CellObject & { s?: unknown }) | undefined;
+      if (existing) {
+        existing.s = cloneStyle(style);
+      } else {
+        outputSheet[address] = {
+          t: 's',
+          v: normalize(row[colIndex]),
+          s: cloneStyle(style)
+        } as XLSX.CellObject & { s?: unknown };
+      }
+    }
+  }
+
+  const removedColumnsAsc = [...columnsToRemove].sort((a, b) => a - b);
+  const transformColumnIndex = (colIndex: number): number | null => {
+    let next = colIndex;
+
+    for (const removedCol of removedColumnsAsc) {
+      if (next === removedCol) {
+        return null;
+      }
+      if (next > removedCol) {
+        next -= 1;
+      }
+    }
+
+    if (next >= insertAt) {
+      next += 2;
+    }
+    if (issuesInsertAt !== -1 && next >= issuesInsertAt) {
+      next += 1;
+    }
+
+    return next;
+  };
+
+  const originalMerges = (worksheet['!merges'] ?? []) as XLSX.Range[];
+  const transformedMerges: XLSX.Range[] = [];
+  for (const merge of originalMerges) {
+    const survivingCols: number[] = [];
+    for (let col = merge.s.c; col <= merge.e.c; col++) {
+      const mapped = transformColumnIndex(col);
+      if (mapped !== null) {
+        survivingCols.push(mapped);
+      }
+    }
+
+    if (survivingCols.length === 0) {
+      continue;
+    }
+
+    transformedMerges.push({
+      s: { r: merge.s.r, c: Math.min(...survivingCols) },
+      e: { r: merge.e.r, c: Math.max(...survivingCols) }
+    });
+  }
+  if (transformedMerges.length > 0) {
+    outputSheet['!merges'] = transformedMerges;
+  }
+
   const blockLevelBackgroundImageConflicts = Array.from(blockLevelImageMap.values())
     .filter((entry) => entry.imageNameMap.size > 1)
     .map((entry) => ({
@@ -412,23 +525,22 @@ export interface AnnotationExtractionResult {
 }
 
 export const extractAnnotationsFromWorkbook = async (
-  inputFile: File,
-  deleteFirstRowOnAnnotation: boolean
+  inputFile: File
 ): Promise<AnnotationExtractionResult> => {
   const arrayBuffer = await inputFile.arrayBuffer();
   const workbook = XLSX.read(arrayBuffer, { type: 'array' });
   const firstSheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[firstSheetName];
   const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as unknown[][];
-  const jsonRaw = deleteFirstRowOnAnnotation ? rawRows.slice(1) : rawRows;
+  const jsonRaw = rawRows;
 
   if (jsonRaw.length === 0) {
     throw new Error('No data rows available after applying row deletion option for annotation.');
   }
 
-  const headerRowIndex = findHeaderRow(jsonRaw);
+  const headerRowIndex = resolveHeaderRowIndex(jsonRaw);
   if (headerRowIndex === -1) {
-    throw new Error("Could not detect standard columns ('X Coords', 'Y Coords', 'Background Image Name') in the spreadsheet.");
+    throw new Error("Could not use second row as header for annotation. Ensure row 2 contains 'X Coords', 'Y Coords', and 'Background Image Name'.");
   }
 
   const headers = jsonRaw[headerRowIndex] || [];
@@ -511,7 +623,7 @@ export const extractAnnotationsFromWorkbook = async (
     if (!parsed) {
       invalidCoordsCount++;
       invalidCoordinates.push({
-        rowNumber: i + (deleteFirstRowOnAnnotation ? 2 : 1),
+        rowNumber: i + 1,
         coordinate: `X: ${normalize(xCoords)}, Y: ${normalize(yCoords)}`
       });
       if (invalidExamples.length < 5) {

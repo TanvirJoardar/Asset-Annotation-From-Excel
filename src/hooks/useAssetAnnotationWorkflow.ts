@@ -248,8 +248,6 @@ export function useAssetAnnotationWorkflow() {
   const [isFileProcessed, setIsFileProcessed] = useState(false);
   const [processedWorkbookBlob, setProcessedWorkbookBlob] = useState<Blob | null>(null);
   const [processedWorkbookName, setProcessedWorkbookName] = useState('Processed_Location_Data.xlsx');
-  const [deleteFirstRow, setDeleteFirstRow] = useState(true);
-  const [deleteFirstRowOnAnnotation, setDeleteFirstRowOnAnnotation] = useState(false);
   const [processingSummary, setProcessingSummary] = useState<ProcessingSummary>({
     totalRows: 0,
     missingBlock: 0,
@@ -278,6 +276,7 @@ export function useAssetAnnotationWorkflow() {
   const [exportProgressPercent, setExportProgressPercent] = useState(0);
   const [exportProgressLabel, setExportProgressLabel] = useState('');
   const [stats, setStats] = useState<Stats>({ excelFiles: 0, annotationsFound: 0, distinctImages: 0 });
+  const annotateFromProcessedFile = isFileProcessed && !!processedWorkbookBlob;
 
   const [options, setOptions] = useState<RenderOptions>({
     color: '#ef4444',
@@ -294,8 +293,6 @@ export function useAssetAnnotationWorkflow() {
     setIsFileProcessed(false);
     setProcessedWorkbookBlob(null);
     setProcessedWorkbookName('Processed_Location_Data.xlsx');
-    setDeleteFirstRow(true);
-    setDeleteFirstRowOnAnnotation(false);
     setProcessingSummary({
       totalRows: 0,
       missingBlock: 0,
@@ -361,7 +358,7 @@ export function useAssetAnnotationWorkflow() {
       }
 
       const inputFile = await excelFileHandle.getFile();
-      const processed = await buildProcessedWorkbook(inputFile, deleteFirstRow);
+      const processed = await buildProcessedWorkbook(inputFile);
 
       setProcessedWorkbookName(processed.outputName);
       setProcessedWorkbookBlob(processed.outputBlob);
@@ -381,7 +378,7 @@ export function useAssetAnnotationWorkflow() {
     } finally {
       setIsFileProcessing(false);
     }
-  }, [deleteFirstRow, directoryHandle]);
+  }, [directoryHandle]);
 
   const downloadProcessedWorkbook = useCallback(() => {
     if (!processedWorkbookBlob) {
@@ -421,7 +418,7 @@ export function useAssetAnnotationWorkflow() {
 
     try {
       const inputFile = await excelFileNode.getFile();
-      const processed = await buildProcessedWorkbook(inputFile, deleteFirstRow, {
+      const processed = await buildProcessedWorkbook(inputFile, {
         backgroundImageFixByBlockLevel: selectedConflictImageByKey
       });
 
@@ -438,10 +435,17 @@ export function useAssetAnnotationWorkflow() {
     } finally {
       setIsFileProcessing(false);
     }
-  }, [deleteFirstRow, directoryHandle, excelHandle, processingSummary.blockLevelBackgroundImageConflicts.length, selectedConflictImageByKey]);
+  }, [directoryHandle, excelHandle, processingSummary.blockLevelBackgroundImageConflicts.length, selectedConflictImageByKey]);
 
   const startProcessing = useCallback(async () => {
     if (!directoryHandle) {
+      return;
+    }
+
+    // Block annotation from processed file if block-level background image conflicts exist
+    if (annotateFromProcessedFile && processingSummary.blockLevelBackgroundImageConflicts.length > 0) {
+      alert('Cannot start annotation: Block-Level background image conflicts detected. Please resolve all conflicts in the Processing Issues panel first.');
+      setIsProcessing(false);
       return;
     }
 
@@ -451,7 +455,7 @@ export function useAssetAnnotationWorkflow() {
       let excelFileNode = excelHandle;
       let availableImageFiles = allImageFiles;
 
-      if (!excelFileNode || availableImageFiles.length === 0) {
+      if (availableImageFiles.length === 0 || (!excelFileNode && !annotateFromProcessedFile)) {
         const discovered = await collectExcelAndImageHandles(directoryHandle);
         excelFileNode = discovered.excelFileHandle;
         availableImageFiles = discovered.imageFiles;
@@ -462,14 +466,19 @@ export function useAssetAnnotationWorkflow() {
         setAllImageFiles(availableImageFiles);
       }
 
-      if (!excelFileNode) {
+      if (!excelFileNode && !annotateFromProcessedFile) {
         alert('No Excel or CSV file found in the chosen folder.');
         setIsProcessing(false);
         return;
       }
 
-      const file = await excelFileNode.getFile();
-      const annotationData = await extractAnnotationsFromWorkbook(file, deleteFirstRowOnAnnotation);
+      const annotationSourceFile = annotateFromProcessedFile && processedWorkbookBlob
+        ? new File([processedWorkbookBlob], processedWorkbookName || 'processed.xlsx', {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        })
+        : await excelFileNode!.getFile();
+
+      const annotationData = await extractAnnotationsFromWorkbook(annotationSourceFile);
 
       const nextDataMap = new Map<string, Annotation[]>();
       const nextImageHandles = new Map<string, AppFileHandle>();
@@ -527,7 +536,7 @@ export function useAssetAnnotationWorkflow() {
     } finally {
       setIsProcessing(false);
     }
-  }, [allImageFiles, deleteFirstRowOnAnnotation, directoryHandle, excelHandle]);
+  }, [allImageFiles, annotateFromProcessedFile, directoryHandle, excelHandle, processedWorkbookBlob, processedWorkbookName]);
 
   const exportZip = useCallback(async () => {
     if (dataMap.size === 0) {
@@ -651,8 +660,6 @@ export function useAssetAnnotationWorkflow() {
   return {
     directoryHandle,
     isProcessed,
-    deleteFirstRow,
-    setDeleteFirstRow,
     isFileProcessing,
     isFileProcessed,
     processSiteFile,
@@ -669,8 +676,7 @@ export function useAssetAnnotationWorkflow() {
     setOptions,
     isProcessing,
     startProcessing,
-    deleteFirstRowOnAnnotation,
-    setDeleteFirstRowOnAnnotation,
+    annotateFromProcessedFile,
     stats,
     dataMap,
     imageHandles,
