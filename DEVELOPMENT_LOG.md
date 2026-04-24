@@ -33,7 +33,20 @@ This file tracks what has been developed in this project.
 - Files changed: `src/App.css`
 - Validation status:
   - `npm run build` passes
-
+### Additional Update (Annotation Column Validation Before Processing)
+- Added pre-annotation validation to check for required columns when annotating without file processing.
+- New utility function `checkRequiredAnnotationColumns()` validates the presence of crucial columns before annotation starts.
+- Required columns checked:
+  - `X Coords`
+  - `Y Coords`
+  - `Background Image Name`
+  - `Block` or `Processed Block`
+  - `Level` or `Processed Level`
+- Updated `startProcessing()` hook to validate columns before annotation when not using processed file.
+- If required columns are missing, shows error toast and aborts annotation process.
+- Files changed: `src/utils/workbookProcessing.ts`, `src/hooks/useAssetAnnotationWorkflow.ts`
+- Validation status:
+  - `npm run build` passes
 ### Additional Update (Modal Overlay Viewport Anchoring Fix)
 - Fixed modal overlay sizing/positioning issue where overlay height followed page content and caused modal clipping off-screen.
 - Updated `ModalPreview` to render via `createPortal(..., document.body)` so the modal is anchored to the viewport instead of transformed/content parents.

@@ -4,7 +4,7 @@ import { saveAs } from 'file-saver';
 import { changeDpiDataUrl } from 'dpi-tools';
 import toast from 'react-hot-toast';
 import { collectExcelAndImageHandles } from '../utils/fileDiscovery';
-import { buildProcessedWorkbook, extractAnnotationsFromWorkbook } from '../utils/workbookProcessing';
+import { buildProcessedWorkbook, extractAnnotationsFromWorkbook, checkRequiredAnnotationColumns } from '../utils/workbookProcessing';
 import { getSafeRenderPlan } from '../utils/imageRendering';
 import type {
   Annotation,
@@ -473,6 +473,18 @@ export function useAssetAnnotationWorkflow() {
         toast.error('No Excel or CSV file found in the chosen folder.');
         setIsProcessing(false);
         return;
+      }
+
+      // If not using processed file, validate required columns before annotation
+      if (!annotateFromProcessedFile && excelFileNode) {
+        const originalFile = await excelFileNode.getFile();
+        const columnCheck = await checkRequiredAnnotationColumns(originalFile);
+        
+        if (columnCheck.missingColumns.length > 0) {
+          toast.error(`Missing required columns: \n${'- ' + columnCheck.missingColumns.join(', \n- ')}. \n\nPlease process the file first or ensure all required columns exist.`);
+          setIsProcessing(false);
+          return;
+        }
       }
 
       const annotationSourceFile = annotateFromProcessedFile && processedWorkbookBlob

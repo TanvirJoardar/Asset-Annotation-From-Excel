@@ -524,6 +524,83 @@ export interface AnnotationExtractionResult {
   hasAnyLabelColumn: boolean;
 }
 
+export interface RequiredAnnotationColumns {
+  hasXCoords: boolean;
+  hasYCoords: boolean;
+  hasBackgroundImage: boolean;
+  hasBlockOrProcessedBlock: boolean;
+  hasLevelOrProcessedLevel: boolean;
+  missingColumns: string[];
+}
+
+export const checkRequiredAnnotationColumns = async (
+  inputFile: File
+): Promise<RequiredAnnotationColumns> => {
+  const arrayBuffer = await inputFile.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+  const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as unknown[][];
+
+  if (rawRows.length === 0) {
+    return {
+      hasXCoords: false,
+      hasYCoords: false,
+      hasBackgroundImage: false,
+      hasBlockOrProcessedBlock: false,
+      hasLevelOrProcessedLevel: false,
+      missingColumns: ['File is empty']
+    };
+  }
+
+  const headerRowIndex = resolveHeaderRowIndex(rawRows);
+  if (headerRowIndex === -1) {
+    return {
+      hasXCoords: false,
+      hasYCoords: false,
+      hasBackgroundImage: false,
+      hasBlockOrProcessedBlock: false,
+      hasLevelOrProcessedLevel: false,
+      missingColumns: ['Could not find header row']
+    };
+  }
+
+  const headers = rawRows[headerRowIndex] || [];
+  
+  const colXCoords = headers.findIndex((h) => isXCoordsHeader(h));
+  const colYCoords = headers.findIndex((h) => isYCoordsHeader(h));
+  const colImage = headers.findIndex((h) => {
+    const key = normalize(h);
+    return key === 'Background Image Name' || key === 'Background Image';
+  });
+  const colProcessedBlock = headers.findIndex((h) => normalize(h).toLowerCase() === 'processed block');
+  const colProcessedLevel = headers.findIndex((h) => normalize(h).toLowerCase() === 'processed level');
+  const colBlock = headers.findIndex((h) => normalize(h).toLowerCase() === 'block');
+  const colLevel = headers.findIndex((h) => normalize(h).toLowerCase() === 'level');
+
+  const hasXCoords = colXCoords !== -1;
+  const hasYCoords = colYCoords !== -1;
+  const hasBackgroundImage = colImage !== -1;
+  const hasBlockOrProcessedBlock = colProcessedBlock !== -1 || colBlock !== -1;
+  const hasLevelOrProcessedLevel = colProcessedLevel !== -1 || colLevel !== -1;
+
+  const missingColumns: string[] = [];
+  if (!hasXCoords) missingColumns.push('X Coords');
+  if (!hasYCoords) missingColumns.push('Y Coords');
+  if (!hasBackgroundImage) missingColumns.push('Background Image Name');
+  if (!hasBlockOrProcessedBlock) missingColumns.push('Block or Processed Block');
+  if (!hasLevelOrProcessedLevel) missingColumns.push('Level or Processed Level');
+
+  return {
+    hasXCoords,
+    hasYCoords,
+    hasBackgroundImage,
+    hasBlockOrProcessedBlock,
+    hasLevelOrProcessedLevel,
+    missingColumns
+  };
+};
+
 export const extractAnnotationsFromWorkbook = async (
   inputFile: File
 ): Promise<AnnotationExtractionResult> => {
