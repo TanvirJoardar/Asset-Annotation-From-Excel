@@ -126,7 +126,7 @@ function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps)
 
   return (
     <>
-      <canvas ref={canvasRef} style={{ display: 'block' }} />
+      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
       {isDownscaled && (
         <div
           style={{

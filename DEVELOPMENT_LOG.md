@@ -2,6 +2,16 @@
 
 This file tracks what has been developed in this project.
 
+## 2026-04-24
+
+### Additional Update (Modal Overlay Viewport Anchoring Fix)
+- Fixed modal overlay sizing/positioning issue where overlay height followed page content and caused modal clipping off-screen.
+- Updated `ModalPreview` to render via `createPortal(..., document.body)` so the modal is anchored to the viewport instead of transformed/content parents.
+- Added explicit viewport sizing on overlay (`width: 100vw`, `height: 100dvh`) for stable centering behavior.
+- Kept zoom/pan interactions intact while improving modal visibility and fit.
+- Validation status:
+  - `npm run build` passes
+
 ## 2026-04-23
 
 ### Additional Update (Labels Card Layout Compact Redesign)

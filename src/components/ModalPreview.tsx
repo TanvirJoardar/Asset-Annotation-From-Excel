@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import { createPortal } from 'react-dom';
 import PreviewCanvas from './PreviewCanvas';
 import type { Annotation, AppFileHandle, RenderOptions } from '../types';
 
@@ -166,41 +167,16 @@ export default function ModalPreview({
     }
   };
 
-  return (
+  const modalElement = (
     <div
       className="modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) setSelectedPreview(null);
       }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999
-      }}
     >
-      <div
-        className="modal-content"
-        ref={modalContentRef}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'relative',
-          background: 'var(--surface, #fff)',
-          padding: '16px',
-          borderRadius: '8px',
-          width: '95vw',
-          height: '95vh',
-          overflow: 'hidden',
-          boxSizing: 'border-box',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10001 }} onClick={(e) => e.stopPropagation()}>
-          <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.55)', padding: '6px', borderRadius: 6 }}>
+      <div className="modal-content" ref={modalContentRef} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-toolbar" onClick={(e) => e.stopPropagation()}>
+          <div className="toolbar-inner">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setModalZoom((z) => Math.max(0.1, z / 1.25)); }}
@@ -246,16 +222,14 @@ export default function ModalPreview({
 
         <div
           ref={scrollRef}
+          className="modal-scroll"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           style={{
-            flex: 1,
             overflow: modalZoom > 1 ? 'auto' : 'hidden',
-            position: 'relative',
-            cursor: isPanningRef.current ? 'grabbing' : (modalZoom > 1 ? 'grab' : 'default'),
-            padding: '20px'
+            cursor: isPanningRef.current ? 'grabbing' : (modalZoom > 1 ? 'grab' : 'default')
           }}
         >
           <div
@@ -276,4 +250,10 @@ export default function ModalPreview({
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') {
+    return modalElement;
+  }
+
+  return createPortal(modalElement, document.body);
 }
