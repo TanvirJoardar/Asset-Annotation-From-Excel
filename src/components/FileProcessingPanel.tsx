@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Ellipsis, FileSpreadsheet, Download, AlertCircle, CheckCircle2, TrendingUp, AlertTriangle, Layers, CheckSquare, Loader2 } from 'lucide-react';
 import type { ProcessingSummary } from '../types';
+import ConfirmationModal from './ConfirmationModal';
 
 interface FileProcessingPanelProps {
   isFileProcessing: boolean;
@@ -32,9 +34,23 @@ export default function FileProcessingPanel({
   onSelectConflictImage,
   onApplyConflictImageFixes
 }: FileProcessingPanelProps) {
+  const [showFixConfirmation, setShowFixConfirmation] = useState(false);
   const conflictCount = processingSummary.blockLevelBackgroundImageConflicts.length;
   const invalidCoordinateCount = processingSummary.coordinateIssues.invalidRowCount;
   const issueCount = invalidCoordinateCount + conflictCount;
+
+  const requestApplyConflictFixes = () => {
+    setShowFixConfirmation(true);
+  };
+
+  const cancelApplyConflictFixes = () => {
+    setShowFixConfirmation(false);
+  };
+
+  const confirmApplyConflictFixes = () => {
+    setShowFixConfirmation(false);
+    void onApplyConflictImageFixes();
+  };
 
   return (
     <div className="glass-panel animate-fade-in" style={{ padding: '2.5rem', marginBottom: '1.5rem' }}>
@@ -356,7 +372,7 @@ export default function FileProcessingPanel({
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="issue-count-capsule">{conflictCount} conflicts</span>
                 {conflictCount > 0 && (
-                  <button type="button" className="btn btn-secondary issue-fix-btn" onClick={() => void onApplyConflictImageFixes()}>
+                  <button type="button" className="btn btn-secondary issue-fix-btn" onClick={requestApplyConflictFixes}>
                     Fix Selected
                   </button>
                 )}
@@ -401,6 +417,16 @@ export default function FileProcessingPanel({
           </section>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={showFixConfirmation}
+        title="Apply selected image fixes?"
+        message="This will reprocess your selected file using the image choices you made for each block-level conflict."
+        confirmLabel="Apply Fixes"
+        cancelLabel="Cancel"
+        onConfirm={confirmApplyConflictFixes}
+        onCancel={cancelApplyConflictFixes}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { changeDpiDataUrl } from 'dpi-tools';
+import toast from 'react-hot-toast';
 import { collectExcelAndImageHandles } from '../utils/fileDiscovery';
 import { buildProcessedWorkbook, extractAnnotationsFromWorkbook } from '../utils/workbookProcessing';
 import { getSafeRenderPlan } from '../utils/imageRendering';
@@ -331,7 +332,7 @@ export function useAssetAnnotationWorkflow() {
     try {
       const maybeWindow = window as Window & { showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<unknown> };
       if (!maybeWindow.showDirectoryPicker) {
-        alert('Your browser does not support the File System Access API. Please use Chrome or Edge.');
+        toast.error('Your browser does not support the File System Access API. Please use Chrome or Edge.');
         return;
       }
 
@@ -353,7 +354,7 @@ export function useAssetAnnotationWorkflow() {
     try {
       const { excelFileHandle, imageFiles } = await collectExcelAndImageHandles(directoryHandle);
       if (!excelFileHandle) {
-        alert('No Excel or CSV file found in the chosen folder.');
+        toast.error('No Excel or CSV file found in the chosen folder.');
         setIsFileProcessing(false);
         return;
       }
@@ -373,9 +374,10 @@ export function useAssetAnnotationWorkflow() {
       setIsProcessed(false);
       setDataMap(new Map());
       setImageHandles(new Map());
+      toast.success('Excel file processed successfully.');
     } catch (e) {
       console.error(e);
-      alert('Error while processing the Excel file: ' + (e as Error).message);
+      toast.error('Error while processing the Excel file: ' + (e as Error).message);
     } finally {
       setIsFileProcessing(false);
     }
@@ -411,7 +413,7 @@ export function useAssetAnnotationWorkflow() {
     }
 
     if (!excelFileNode) {
-      alert('No Excel or CSV file found in the chosen folder.');
+      toast.error('No Excel or CSV file found in the chosen folder.');
       return;
     }
 
@@ -429,10 +431,10 @@ export function useAssetAnnotationWorkflow() {
       setSelectedConflictImageByKey(buildDefaultConflictSelections(processed.summary));
 
       const fixedConflictsCount = processingSummary.blockLevelBackgroundImageConflicts.length - processed.summary.blockLevelBackgroundImageConflicts.length;
-      alert(`Applied image fixes. Resolved ${Math.max(0, fixedConflictsCount)} conflict(s).`);
+      toast.success(`Applied image fixes. Resolved ${Math.max(0, fixedConflictsCount)} conflict(s).`);
     } catch (e) {
       console.error(e);
-      alert('Error while applying image fixes: ' + (e as Error).message);
+      toast.error('Error while applying image fixes: ' + (e as Error).message);
     } finally {
       setIsFileProcessing(false);
     }
@@ -445,7 +447,7 @@ export function useAssetAnnotationWorkflow() {
 
     // Block annotation from processed file if block-level background image conflicts exist
     if (annotateFromProcessedFile && processingSummary.blockLevelBackgroundImageConflicts.length > 0) {
-      alert('Cannot start annotation: Block-Level background image conflicts detected. Please resolve all conflicts in the Processing Issues panel first.');
+      toast.error('Cannot start annotation: Block-Level background image conflicts detected. Please resolve all conflicts in the Processing Issues panel first.');
       setIsProcessing(false);
       return;
     }
@@ -468,7 +470,7 @@ export function useAssetAnnotationWorkflow() {
       }
 
       if (!excelFileNode && !annotateFromProcessedFile) {
-        alert('No Excel or CSV file found in the chosen folder.');
+        toast.error('No Excel or CSV file found in the chosen folder.');
         setIsProcessing(false);
         return;
       }
@@ -516,11 +518,15 @@ export function useAssetAnnotationWorkflow() {
         console.groupCollapsed(`[X/Y Coords] Annotation Invalid Rows: ${annotationData.invalidCoordsCount}`);
         console.log(annotationData.invalidCoordinates);
         console.groupEnd();
-        alert(`${annotationData.invalidCoordsCount} rows had invalid X/Y coordinates and were skipped. Examples: ${annotationData.invalidExamples.join(', ')}`);
+        toast(`Warning: ${annotationData.invalidCoordsCount} rows had invalid X/Y coordinates and were skipped. Examples: ${annotationData.invalidExamples.join(', ')} \n\n Check Console for Details`, {
+          duration: 6000
+        });
       }
 
       if (!annotationData.hasAnyLabelColumn) {
-        alert("Warning: Neither 'Sensor Id' nor 'Sensor Display Name' columns were found. Labels will be empty.");
+        toast("Warning: Neither 'Sensor Id' nor 'Sensor Display Name' columns were found. Labels will be empty.", {
+          duration: 5000
+        });
       }
 
       setStats({
@@ -531,9 +537,10 @@ export function useAssetAnnotationWorkflow() {
 
       setImageHandles(nextImageHandles);
       setIsProcessed(true);
+      toast.success('Annotation groups prepared successfully.');
     } catch (e) {
       console.error(e);
-      alert('Error processing folder: ' + (e as Error).message);
+      toast.error('Error processing folder: ' + (e as Error).message);
     } finally {
       setIsProcessing(false);
     }
@@ -555,7 +562,9 @@ export function useAssetAnnotationWorkflow() {
       const maxWorkers = Math.max(1, Math.min(3, (typeof navigator !== 'undefined' ? Math.floor((navigator.hardwareConcurrency || 4) / 2) : 2)));
 
       if (total === 0) {
-        alert('No matching images found to export.');
+        toast('Warning: No matching images found to export.', {
+          duration: 4500
+        });
         return;
       }
 
@@ -624,21 +633,16 @@ export function useAssetAnnotationWorkflow() {
       );
 
       saveAs(content, 'Annotated_Images.zip');
+      toast.success('Annotated ZIP export completed.');
 
       if (failed > 0) {
-        const previewItems = failedItems.slice(0, 12).map((item, index) => (
-          `${index + 1}. Block: ${item.block} | Level: ${item.level} | Image: ${item.imagePath} | Reason: ${item.reason}`
-        ));
-        const remaining = failedItems.length - previewItems.length;
-        const moreText = remaining > 0 ? `\n...and ${remaining} more.` : '';
-
-        alert(
-          `Export finished with ${failed} skipped image(s).\n\n` +
-          `Failed items:\n${previewItems.join('\n')}${moreText}`
-        );
+        console.groupCollapsed(`[Export] Skipped images: ${failed}`);
+        console.table(failedItems);
+        console.groupEnd();
+        toast.error(`Export finished with ${failed} skipped image(s). Open browser console for details.`);
       }
     } catch (err) {
-      alert('Error generating zip: ' + (err as Error).message);
+      toast.error('Error generating zip: ' + (err as Error).message);
     } finally {
       setExportProgressPercent(0);
       setExportProgressLabel('');

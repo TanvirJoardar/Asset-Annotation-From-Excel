@@ -148,7 +148,7 @@ input[type="color"]::-moz-color-swatch:hover {
 .processing-options-panel {
   position: relative;
   padding: 1.35rem;
-  overflow: hidden;
+  overflow: visible;
   background:
     radial-gradient(circle at 8% 6%, rgba(59, 130, 246, 0.12), transparent 45%),
     radial-gradient(circle at 92% 95%, rgba(16, 185, 129, 0.1), transparent 50%),
@@ -518,11 +518,37 @@ input[type="color"]::-moz-color-swatch:hover {
   padding: 0.48rem 0.64rem;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  /* show custom arrow and reserve space on the right */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 2.6rem;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+}
+
+/* Hide IE default expand arrow when using custom arrow */
+select::-ms-expand {
+  display: none;
 }
 
 .option-select:focus-visible {
   border-color: color-mix(in srgb, var(--accent-primary) 65%, #fff 10%);
   box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+}
+
+/* Style the dropdown options for better visibility */
+.option-select option {
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 8px 12px;
+}
+
+.option-select option:checked {
+  background: #0f172a;
+  color: #f8fafc;
 }
 
 .processing-status-banner {
@@ -1477,6 +1503,38 @@ input[type="checkbox"]:focus {
   font-size: 0.9rem;
 }
 
+.confirm-modal-content {
+  width: min(480px, 92vw);
+  background: linear-gradient(160deg, rgba(8, 12, 26, 0.94), rgba(5, 8, 18, 0.88));
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.6);
+  padding: 1.2rem;
+}
+
+.confirm-modal-title {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #f8fafc;
+}
+
+.confirm-modal-message {
+  margin: 0.6rem 0 0;
+  color: rgba(203, 213, 225, 0.92);
+  line-height: 1.45;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.confirm-modal-confirm-btn {
+  min-width: 120px;
+}
+
 @media (max-width: 640px) {
   .modal-content {
     width: 100%;
@@ -1502,5 +1560,10 @@ input[type="checkbox"]:focus {
   .preview-badge {
     font-size: 0.7rem;
     padding: 0.2rem 0.45rem;
+  }
+
+  .confirm-modal-content {
+    width: calc(100vw - 1.5rem);
+    padding: 1rem;
   }
 }

@@ -4,6 +4,36 @@ This file tracks what has been developed in this project.
 
 ## 2026-04-24
 
+### Additional Update (Toast Notifications + Permission Confirmation Modal)
+- Replaced workflow `alert(...)` messages with non-blocking toast notifications using `react-hot-toast`.
+- Added app-level toaster in top-right position for consistent status/error/warning messaging.
+- Added a reusable `ConfirmationModal` component for explicit user permission actions.
+- Updated `FileProcessingPanel` so `Fix Selected` now opens a confirmation modal before applying image conflict fixes.
+- Improved export feedback UX:
+  - Success is shown with toast after ZIP generation.
+  - Skipped export items are summarized via toast and detailed in browser console.
+- Validation status:
+  - `npm run build` passes
+
+### Additional Update (Toaster Anchored To Viewport Top-Right)
+- Fixed toast positioning so notifications appear at the screen top-right, not relative to the centered app container.
+- Root cause: toaster was mounted inside `.app-container.animate-fade-in`, and container transform context affected fixed positioning behavior.
+- Moved `<Toaster />` mount from `App.tsx` to `main.tsx` (root level under `StrictMode`).
+- Kept existing toast theme/styles unchanged.
+- Validation status:
+  - `npm run build` passes
+
+### Additional Update (Dropdown UX: Select Arrow & Visibility Fix)
+- Fixed `Label Type` and `Output DPI` selects for better visibility and usability.
+- Changes:
+  - Set `.processing-options-panel` overflow to `visible` so the select popup isn't clipped by the panel container.
+  - Added a compact, themed SVG arrow background and reserved right padding for `.option-select` so the down arrow appears reliably.
+  - Styled dropdown options with dark background (`#1e293b`) and light text (`#f8fafc`) for high contrast in the option list.
+  - Normalized appearance across browsers with `appearance: none` and a small focus ring for accessibility.
+- Files changed: `src/App.css`
+- Validation status:
+  - `npm run build` passes
+
 ### Additional Update (Modal Overlay Viewport Anchoring Fix)
 - Fixed modal overlay sizing/positioning issue where overlay height followed page content and caused modal clipping off-screen.
 - Updated `ModalPreview` to render via `createPortal(..., document.body)` so the modal is anchored to the viewport instead of transformed/content parents.
