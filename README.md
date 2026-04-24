@@ -7,8 +7,8 @@ Built using native modern File System Access APIs, this platform keeps all of yo
 ### 🌟 Key Features
 
 - **Pure Local Execution**: Effortlessly process large directories filled with heavy `.png` assets entirely off-cloud.
-- **Intelligent Pattern Matching**: Automatically pulls "Sensor ID", "X Coords", "Y Coords", and "Background Image Name" columns and groups logic intuitively.
-- **Dynamic Configuration UI**: Live control board to change outline properties, colors, toggle ID text labeling, and select structural markers using responsive HTML5 capabilities.
+- **Intelligent Pattern Matching**: Automatically pulls essential columns like "Sensor ID", "X Coords", "Y Coords", and "Background Image Name" and groups logic intuitively.
+- **Dynamic Configuration UI**: Live control board to change outline properties, colors, toggle ID/Label text labeling, and select structural markers using responsive HTML5 capabilities.
 - **Production-Ready DPI Output**: Configurable output parameters (e.g. `300 DPI` / `600 DPI`) bypassing generic `72 DPI` web-hooks, preserving crucial density formats utilizing embedded chunk writing.
 - **1-Click Packaging**: Automatically zips all annotated exports utilizing `jszip` without leaving the client viewer.
 
@@ -19,6 +19,24 @@ Built using native modern File System Access APIs, this platform keeps all of yo
 - **DPI-Tools**: Injecting precise `pHYs` metadata chunks into raw canvas blobs to maintain engineering print standard density schemas.
 - **Lucide React**: For sleek, beautiful SVG vector iconography.
 - **Glassmorphism CSS Design**: Using curated `Inter` typography, smooth animation states, background blurs, and deep dark-mode tailored layouts.
+
+---
+
+## 📊 Excel/CSV File Configuration
+
+For the application to correctly map your coordinates to the background images, your Excel (`.xlsx`) or `.csv` file must contain specific column headers. The app typically expects the headers to be on **Row 2** (or gracefully falls back to Row 1 if there's no title row).
+
+### Required Columns
+* **`X Coords`**: The X-axis location on the background image where the marker should be placed.
+* **`Y Coords`**: The Y-axis location on the background image where the marker should be placed.
+* **`Background Image Name`** (or `Background Image`): The exact filename of the local image (e.g., `Floor1_Plan.png` or just `Floor1_Plan`) to draw this coordinate on.
+* **`Block`** / **`Processed Block`**: The specific building/block name (helps organize output).
+* **`Level`** / **`Processed Level`**: The specific floor/level name (helps organize output).
+* **`Location Descriptor`**: A combined string (e.g., `Room_BlockA_L1`). Note: If the explicit `Block` and `Level` columns are missing from your raw data, the software absolutely requires the `Location Descriptor` column. You must execute the **Data Processing** phase first so the application can intelligently isolate the Block and Level data from this string.
+
+### Optional Columns
+* **`Sensor Id`**: A unique identifier. Used as the label text drawn on the image next to the marker if labels are enabled.
+* **`Display Name`**: An alternative string that can be used for label text alongside/instead of the Sensor ID.
 
 ---
 
@@ -47,10 +65,15 @@ If you are running the project natively, follow the steps below:
 
 ## 📖 Usage Instructions
 
-1. Upon successfully loading the page, click the **Browse Folder** dropzone target.
-2. Select your overarching directory holding your CSV/Excel `.xlsx` and the visual assets (e.g., `G:\Development\App\Asset-Annotation-From-Excel\SDP Backgrounds`).
-3. Whenever Chrome/Edge prompts: "Let site view files?", click **Allow** so the app can verify image connections.
-4. On the configuration window, confirm your desired Radius and Colors.
-5. Hit **Start Annotation**. The software rapidly extracts your mappings, calculates exact Cartesian sizes, and paints the canvas layers seamlessly generating your previews below.
-6. Check your Match Preview boards!
-7. Finally, hit **Export Annotated ZIP** to neatly package your final processed visual drafts onto your filesystem. If you want to run another target, just hit **New Location** to cleanly start over!
+The annotation flow ensures your data is clean before starting the rendering process. Follow these steps:
+
+1. **Select Workspace**: Click the **Browse Folder** dropzone target. Select your overarching directory holding your CSV/Excel `.xlsx` file and the visual background image assets.
+2. **Grant Permissions**: Whenever Chrome/Edge prompts: "Let site view files?", click **Allow** so the app can verify file connections safely on your local machine.
+3. **Data Processing & Validation**: 
+   - Before annotating, the system will parse your raw Excel file. If your file is missing explicit `Block` and `Level` columns, execute the data processing step to automatically generate them from the `Location Descriptor` column.
+   - You will be presented with a **Validation Screen** showing processing statistics, invalid coordinate issues, or Background Image conflicts (e.g., multiple different image names assigned to the same Block/Level combination).
+   - Resolve any conflicts directly in the UI.
+4. **Configure Appearance**: After resolving data conflicts or directly if no conflicts exist, adjust your desired Outline Radius, Colors, Outline Toggles, and Label settings on the configuration window.
+5. **Start Annotation**: Hit **Start Annotation**. The software rapidly extracts your mappings, calculates exact Cartesian sizes based on the DPI configuration, and paints the canvas layers seamlessly to generate your visual previews.
+6. **Review Previews**: Check your Match Preview boards generated below!
+7. **Export**: Finally, hit **Export Annotated ZIP** to neatly package your final annotated `.png` drafts structurally into folders based on Block/Level directly onto your filesystem. Click **New Location** to start over with a fresh folder.
