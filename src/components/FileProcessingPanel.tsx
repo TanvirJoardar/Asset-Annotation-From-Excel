@@ -372,8 +372,21 @@ export default function FileProcessingPanel({
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className="issue-count-capsule">{conflictCount} conflicts</span>
                 {conflictCount > 0 && (
-                  <button type="button" className="btn btn-secondary issue-fix-btn" onClick={requestApplyConflictFixes}>
-                    Fix Selected
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary issue-fix-btn" 
+                    onClick={requestApplyConflictFixes}
+                    disabled={isFileProcessing}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    {isFileProcessing ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Fixing...
+                      </>
+                    ) : (
+                      'Fix Selected'
+                    )}
                   </button>
                 )}
               </div>
