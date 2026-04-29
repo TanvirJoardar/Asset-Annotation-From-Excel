@@ -54,6 +54,18 @@ This file tracks what has been developed in this project.
 - The Issues button now toggles the "Blocks With Unidentified Levels" card along with the processing issues panel.
 - File changed: `src/components/FileProcessingPanel.tsx`
 
+### Additional Update (Processing Stats Cards)
+- Added stats cards for X/Y coordinate issues and background image conflicts.
+- Set the stats grid to three cards per row (six total across two rows).
+- File changed: `src/components/FileProcessingPanel.tsx`
+  - Reordered X/Y coordinate issues after Unidentified Level and refreshed card palettes for unique colors.
+  - Made the stats grid responsive with 3/2/1 columns by viewport size.
+
+### Additional Update (Header Home Button)
+- Added a home icon button in the header that navigates to the home page.
+- Files changed: `src/components/AppHeader.tsx`, `src/App.css`
+  - Home button now appears when a workspace is selected and resets the app state.
+
 ### Additional Update (Toaster Anchored To Viewport Top-Right)
 - Fixed toast positioning so notifications appear at the screen top-right, not relative to the centered app container.
 - Root cause: toaster was mounted inside `.app-container.animate-fade-in`, and container transform context affected fixed positioning behavior.

@@ -155,7 +155,7 @@ export default function FileProcessingPanel({
               }}
             >
               <span className="issue-status-dot" aria-hidden="true" />
-              {processingSummary.hasIssues ? `Issues (${issueCount})` : 'No Issues'}
+              {processingSummary.hasIssues ? `View Issues (${issueCount})` : 'No Issues'}
             </button>
           </>
         )}
@@ -186,12 +186,7 @@ export default function FileProcessingPanel({
 
       {/* Stats Grid */}
       {isFileProcessed && (
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
-          gap: '1.25rem',
-          marginTop: '2rem'
-        }}>
+        <div className="processing-stats-grid" style={{ marginTop: '2rem' }}>
           {/* Total Rows */}
           <div style={{
             background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05))',
@@ -250,8 +245,8 @@ export default function FileProcessingPanel({
 
           {/* Missing Block */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05))',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
+            background: 'linear-gradient(135deg, rgba(248, 113, 113, 0.12), rgba(190, 24, 93, 0.05))',
+            border: '1px solid rgba(248, 113, 113, 0.25)',
             borderRadius: 'var(--radius-lg)',
             padding: '1.5rem',
             transition: 'all 0.3s ease'
@@ -261,25 +256,25 @@ export default function FileProcessingPanel({
                 width: '36px',
                 height: '36px',
                 borderRadius: 'var(--radius-md)',
-                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1))',
+                background: 'linear-gradient(135deg, rgba(248, 113, 113, 0.2), rgba(248, 113, 113, 0.1))',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#ef4444'
+                color: '#f87171'
               }}>
                 <AlertCircle size={18} />
               </div>
               <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unidentified Block</span>
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #f87171, #ef4444)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #fca5a5, #fb7185)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               {processingSummary.missingBlock}
             </div>
           </div>
 
           {/* Missing Level */}
           <div style={{
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(234, 88, 12, 0.05))',
-            border: '1px solid rgba(245, 158, 11, 0.2)',
+            background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.12), rgba(234, 88, 12, 0.05))',
+            border: '1px solid rgba(250, 204, 21, 0.25)',
             borderRadius: 'var(--radius-lg)',
             padding: '1.5rem',
             transition: 'all 0.3s ease'
@@ -289,18 +284,74 @@ export default function FileProcessingPanel({
                   width: '36px',
                   height: '36px',
                   borderRadius: 'var(--radius-md)',
-                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1))',
+                  background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.22), rgba(250, 204, 21, 0.1))',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#f59e0b'
+                  color: '#facc15'
                 }}>
                   <Layers size={18} />
                 </div>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unidentified Level</span>
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #fde047, #f59e0b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               {processingSummary.missingLevel}
+            </div>
+          </div>
+
+            {/* Coordinate Issues */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.12), rgba(139, 92, 246, 0.05))',
+              border: '1px solid rgba(167, 139, 250, 0.25)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '1.5rem',
+              transition: 'all 0.3s ease'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.2), rgba(167, 139, 250, 0.1))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#a78bfa'
+                }}>
+                  <AlertTriangle size={18} />
+                </div>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>X/Y Coordinate Issues</span>
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #c4b5fd, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                {invalidCoordinateCount}
+              </div>
+            </div>
+
+          {/* Background Image Conflicts */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255, 198, 128, 0.16), rgba(255, 198, 128, 0.05))',
+            border: '1px solid rgba(255, 198, 128, 0.35)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem',
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: 'var(--radius-md)',
+                background: 'linear-gradient(135deg, rgba(255, 198, 128, 0.3), rgba(255, 198, 128, 0.12))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffc680'
+              }}>
+                <AlertCircle size={18} />
+              </div>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Background Image Conflicts</span>
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #ffd7a3, #ffc680)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              {conflictCount}
             </div>
           </div>
         </div>
