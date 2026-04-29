@@ -4,7 +4,12 @@ import { saveAs } from 'file-saver';
 import { changeDpiDataUrl } from 'dpi-tools';
 import toast from 'react-hot-toast';
 import { collectExcelAndImageHandles } from '../utils/fileDiscovery';
-import { buildProcessedWorkbook, extractAnnotationsFromWorkbook, checkRequiredAnnotationColumns } from '../utils/workbookProcessing';
+import {
+  buildProcessedWorkbook,
+  extractAnnotationsFromWorkbook,
+  checkRequiredAnnotationColumns,
+  checkRequiredProcessingColumns
+} from '../utils/workbookProcessing';
 import { getSafeRenderPlan } from '../utils/imageRendering';
 import type {
   Annotation,
@@ -281,7 +286,7 @@ export function useAssetAnnotationWorkflow() {
 
   const [options, setOptions] = useState<RenderOptions>({
     color: '#ef4444',
-    labelColor: '#f8fafc',
+    labelColor: '#0F0BDA',
     drawText: true,
     radius: 15,
     dpi: 300,
@@ -360,6 +365,14 @@ export function useAssetAnnotationWorkflow() {
       }
 
       const inputFile = await excelFileHandle.getFile();
+      const processingColumnCheck = await checkRequiredProcessingColumns(inputFile);
+
+      if (processingColumnCheck.missingColumns.length > 0) {
+        toast.error(`Missing required columns: \n${'- ' + processingColumnCheck.missingColumns.join(', \n- ')}. \n\nPlease update your file and try again.`);
+        setIsFileProcessing(false);
+        return;
+      }
+
       const processed = await buildProcessedWorkbook(inputFile);
 
       setProcessedWorkbookName(processed.outputName);

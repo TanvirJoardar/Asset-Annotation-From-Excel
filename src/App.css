@@ -1046,6 +1046,7 @@ select::-ms-expand {
   font-weight: 700;
   font-family: var(--font-display);
   color: var(--text-primary);
+  margin-left: 10px;
 }
 
 /* Preview Grid */

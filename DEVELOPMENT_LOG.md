@@ -15,6 +15,34 @@ This file tracks what has been developed in this project.
 - Validation status:
   - `npm run build` passes
 
+## 2026-04-29
+
+### Additional Update (Pre-Processing Column Validation)
+- Added a pre-processing validation check to ensure required columns exist before processing the Excel file.
+- Required columns checked:
+  - `Location Descriptor`
+  - `Sensor Id`
+  - `Sensor Display Name`
+  - `Background Image Name`
+  - `X Coords`
+  - `Y Coords`
+- If any are missing, a toast error is shown and processing is aborted.
+- Files changed: `src/utils/workbookProcessing.ts`, `src/hooks/useAssetAnnotationWorkflow.ts`
+
+### Additional Update (Default Label Color)
+- Updated the default label color to `#0F0BDA` for new sessions.
+- File changed: `src/hooks/useAssetAnnotationWorkflow.ts`
+
+### Additional Update (Processed Columns Required for Annotation)
+- Tightened annotation pre-check to require `Processed Block` and `Processed Level` specifically.
+- Updated missing-column messaging to list only processed column names.
+- File changed: `src/utils/workbookProcessing.ts`
+
+### Additional Update (Exact Background Image Name Requirement)
+- Tightened background image header checks to require `Background Image Name` (no alias).
+- Updated README required columns to match the exact header names.
+- Files changed: `src/utils/workbookProcessing.ts`, `README.md`
+
 ### Additional Update (Toaster Anchored To Viewport Top-Right)
 - Fixed toast positioning so notifications appear at the screen top-right, not relative to the centered app container.
 - Root cause: toaster was mounted inside `.app-container.animate-fade-in`, and container transform context affected fixed positioning behavior.
@@ -40,8 +68,8 @@ This file tracks what has been developed in this project.
   - `X Coords`
   - `Y Coords`
   - `Background Image Name`
-  - `Block` or `Processed Block`
-  - `Level` or `Processed Level`
+  - `Processed Block`
+  - `Processed Level`
 - Updated `startProcessing()` hook to validate columns before annotation when not using processed file.
 - If required columns are missing, shows error toast and aborts annotation process.
 - Files changed: `src/utils/workbookProcessing.ts`, `src/hooks/useAssetAnnotationWorkflow.ts`

@@ -29,10 +29,10 @@ For the application to correctly map your coordinates to the background images, 
 ### Required Columns
 * **`X Coords`**: The X-axis location on the background image where the marker should be placed.
 * **`Y Coords`**: The Y-axis location on the background image where the marker should be placed.
-* **`Background Image Name`** (or `Background Image`): The exact filename of the local image (e.g., `Floor1_Plan.png` or just `Floor1_Plan`) to draw this coordinate on.
-* **`Block`** / **`Processed Block`**: The specific building/block name (helps organize output).
-* **`Level`** / **`Processed Level`**: The specific floor/level name (helps organize output).
-* **`Location Descriptor`**: A combined string (e.g., `Room_BlockA_L1`). Note: If the explicit `Block` and `Level` columns are missing from your raw data, the software absolutely requires the `Location Descriptor` column. You must execute the **Data Processing** phase first so the application can intelligently isolate the Block and Level data from this string.
+* **`Background Image Name`**: The exact filename of the local image (e.g., `Floor1_Plan.png` or just `Floor1_Plan`) to draw this coordinate on.
+* **`Processed Block`**: The specific building/block name (helps organize output).
+* **`Processed Level`**: The specific floor/level name (helps organize output).
+* **`Location Descriptor`**: A combined string (e.g., `Room_BlockA_L1`). Note: The app requires the `Location Descriptor` column so the **Data Processing** phase can generate the processed block and level columns.
 
 ### Optional Columns
 * **`Sensor Id`**: A unique identifier. Used as the label text drawn on the image next to the marker if labels are enabled.
@@ -70,7 +70,7 @@ The annotation flow ensures your data is clean before starting the rendering pro
 1. **Select Workspace**: Click the **Browse Folder** dropzone target. Select your overarching directory holding your CSV/Excel `.xlsx` file and the visual background image assets.
 2. **Grant Permissions**: Whenever Chrome/Edge prompts: "Let site view files?", click **Allow** so the app can verify file connections safely on your local machine.
 3. **Data Processing & Validation**: 
-   - Before annotating, the system will parse your raw Excel file. If your file is missing explicit `Block` and `Level` columns, execute the data processing step to automatically generate them from the `Location Descriptor` column.
+   - Before annotating, the system will parse your raw Excel file. Use the data processing step to automatically generate `Processed Block` and `Processed Level` from the `Location Descriptor` column.
    - You will be presented with a **Validation Screen** showing processing statistics, invalid coordinate issues, or Background Image conflicts (e.g., multiple different image names assigned to the same Block/Level combination).
    - Resolve any conflicts directly in the UI.
 4. **Configure Appearance**: After resolving data conflicts or directly if no conflicts exist, adjust your desired Outline Radius, Colors, Outline Toggles, and Label settings on the configuration window.

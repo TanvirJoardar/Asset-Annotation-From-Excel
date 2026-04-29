@@ -81,10 +81,7 @@ const findHeaderRow = (jsonRaw: unknown[][]): number => {
 
     const hasXCoords = row.some((cell) => isXCoordsHeader(cell));
     const hasYCoords = row.some((cell) => isYCoordsHeader(cell));
-    const hasBackground = row.some((cell) => {
-      const key = normalizeHeaderKey(cell);
-      return key === 'background image name' || key === 'background image';
-    });
+    const hasBackground = row.some((cell) => normalizeHeaderKey(cell) === 'background image name');
 
     if (hasXCoords && hasYCoords && hasBackground) {
       return i;
@@ -219,10 +216,7 @@ export const buildProcessedWorkbook = async (
   const colXCoords = finalHeader.findIndex((h) => isXCoordsHeader(h));
   const colYCoords = finalHeader.findIndex((h) => isYCoordsHeader(h));
   const colIssues = finalHeader.findIndex((h) => normalizeHeaderKey(h) === 'issues');
-  const colBackgroundImage = finalHeader.findIndex((h) => {
-    const key = normalizeHeaderKey(h);
-    return key === 'background image name' || key === 'background image';
-  });
+  const colBackgroundImage = finalHeader.findIndex((h) => normalizeHeaderKey(h) === 'background image name');
 
   let totalRows = 0;
   let missingBlock = 0;
@@ -533,6 +527,85 @@ export interface RequiredAnnotationColumns {
   missingColumns: string[];
 }
 
+export interface RequiredProcessingColumns {
+  hasLocationDescriptor: boolean;
+  hasSensorId: boolean;
+  hasSensorDisplayName: boolean;
+  hasBackgroundImage: boolean;
+  hasXCoords: boolean;
+  hasYCoords: boolean;
+  missingColumns: string[];
+}
+
+export const checkRequiredProcessingColumns = async (
+  inputFile: File
+): Promise<RequiredProcessingColumns> => {
+  const arrayBuffer = await inputFile.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+  const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as unknown[][];
+
+  if (rawRows.length === 0) {
+    return {
+      hasLocationDescriptor: false,
+      hasSensorId: false,
+      hasSensorDisplayName: false,
+      hasBackgroundImage: false,
+      hasXCoords: false,
+      hasYCoords: false,
+      missingColumns: ['File is empty']
+    };
+  }
+
+  const headerRowIndex = resolveHeaderRowIndex(rawRows);
+  if (headerRowIndex === -1) {
+    return {
+      hasLocationDescriptor: false,
+      hasSensorId: false,
+      hasSensorDisplayName: false,
+      hasBackgroundImage: false,
+      hasXCoords: false,
+      hasYCoords: false,
+      missingColumns: ['Could not find header row']
+    };
+  }
+
+  const headers = rawRows[headerRowIndex] || [];
+
+  const colLocationDescriptor = headers.findIndex((h) => normalize(h).toLowerCase() === 'location descriptor');
+  const colSensorId = headers.findIndex((h) => normalize(h).toLowerCase() === 'sensor id');
+  const colSensorDisplayName = headers.findIndex((h) => /display\s*name/i.test(normalize(h)));
+  const colXCoords = headers.findIndex((h) => isXCoordsHeader(h));
+  const colYCoords = headers.findIndex((h) => isYCoordsHeader(h));
+  const colImage = headers.findIndex((h) => normalize(h) === 'Background Image Name');
+
+  const hasLocationDescriptor = colLocationDescriptor !== -1;
+  const hasSensorId = colSensorId !== -1;
+  const hasSensorDisplayName = colSensorDisplayName !== -1;
+  const hasBackgroundImage = colImage !== -1;
+  const hasXCoords = colXCoords !== -1;
+  const hasYCoords = colYCoords !== -1;
+
+  const missingColumns: string[] = [];
+  if (!hasLocationDescriptor) missingColumns.push('Location Descriptor');
+  if (!hasSensorId) missingColumns.push('Sensor Id');
+  if (!hasSensorDisplayName) missingColumns.push('Sensor Display Name');
+  if (!hasBackgroundImage) missingColumns.push('Background Image Name');
+  if (!hasXCoords) missingColumns.push('X Coords');
+  if (!hasYCoords) missingColumns.push('Y Coords');
+
+  return {
+    hasLocationDescriptor,
+    hasSensorId,
+    hasSensorDisplayName,
+    hasBackgroundImage,
+    hasXCoords,
+    hasYCoords,
+    missingColumns
+  };
+};
+
 export const checkRequiredAnnotationColumns = async (
   inputFile: File
 ): Promise<RequiredAnnotationColumns> => {
@@ -569,27 +642,22 @@ export const checkRequiredAnnotationColumns = async (
   
   const colXCoords = headers.findIndex((h) => isXCoordsHeader(h));
   const colYCoords = headers.findIndex((h) => isYCoordsHeader(h));
-  const colImage = headers.findIndex((h) => {
-    const key = normalize(h);
-    return key === 'Background Image Name' || key === 'Background Image';
-  });
+  const colImage = headers.findIndex((h) => normalize(h) === 'Background Image Name');
   const colProcessedBlock = headers.findIndex((h) => normalize(h).toLowerCase() === 'processed block');
   const colProcessedLevel = headers.findIndex((h) => normalize(h).toLowerCase() === 'processed level');
-  const colBlock = headers.findIndex((h) => normalize(h).toLowerCase() === 'block');
-  const colLevel = headers.findIndex((h) => normalize(h).toLowerCase() === 'level');
 
   const hasXCoords = colXCoords !== -1;
   const hasYCoords = colYCoords !== -1;
   const hasBackgroundImage = colImage !== -1;
-  const hasBlockOrProcessedBlock = colProcessedBlock !== -1 || colBlock !== -1;
-  const hasLevelOrProcessedLevel = colProcessedLevel !== -1 || colLevel !== -1;
+  const hasBlockOrProcessedBlock = colProcessedBlock !== -1;
+  const hasLevelOrProcessedLevel = colProcessedLevel !== -1;
 
   const missingColumns: string[] = [];
   if (!hasXCoords) missingColumns.push('X Coords');
   if (!hasYCoords) missingColumns.push('Y Coords');
   if (!hasBackgroundImage) missingColumns.push('Background Image Name');
-  if (!hasBlockOrProcessedBlock) missingColumns.push('Block or Processed Block');
-  if (!hasLevelOrProcessedLevel) missingColumns.push('Level or Processed Level');
+  if (!hasBlockOrProcessedBlock) missingColumns.push('Processed Block');
+  if (!hasLevelOrProcessedLevel) missingColumns.push('Processed Level');
 
   return {
     hasXCoords,
@@ -625,10 +693,7 @@ export const extractAnnotationsFromWorkbook = async (
   const colDisplayName = headers.findIndex((h) => /display\s*name/i.test(normalize(h)));
   const colXCoords = headers.findIndex((h) => isXCoordsHeader(h));
   const colYCoords = headers.findIndex((h) => isYCoordsHeader(h));
-  const colImage = headers.findIndex((h) => {
-    const key = normalize(h);
-    return key === 'Background Image Name' || key === 'Background Image';
-  });
+  const colImage = headers.findIndex((h) => normalize(h) === 'Background Image Name');
   const colProcessedBlock = headers.findIndex((h) => normalize(h).toLowerCase() === 'processed block');
   const colProcessedLevel = headers.findIndex((h) => normalize(h).toLowerCase() === 'processed level');
   const colBlock = headers.findIndex((h) => normalize(h).toLowerCase() === 'block');
