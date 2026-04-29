@@ -113,6 +113,17 @@ const pickAdjacentStyle = (rowStyles: unknown[], index: number): unknown => {
   return cloneStyle(rowStyles[index - 1] ?? rowStyles[index + 1]);
 };
 
+const applyIssueHighlight = (style: unknown): unknown => {
+  const base = (style && typeof style === 'object') ? (style as Record<string, unknown>) : {};
+  return {
+    ...base,
+    fill: {
+      patternType: 'solid',
+      fgColor: { rgb: 'FFFECACA' }
+    }
+  };
+};
+
 export interface ProcessedWorkbookResult {
   outputBlob: Blob;
   outputName: string;
@@ -227,6 +238,7 @@ export const buildProcessedWorkbook = async (
   let coordinateMoreThanTwoValuesCount = 0;
   let coordinateZeroValueCount = 0;
   const coordinateInvalidBlankOrZeroRows = new Set<number>();
+  const coordinateIssueRows: number[] = [];
   const blocksWithMissingOrBlankLevelMap = new Map<string, { missingCount: number; blankCount: number }>();
   const blockLevelImageMap = new Map<string, {
     blockName: string;
@@ -326,6 +338,10 @@ export const buildProcessedWorkbook = async (
         }
       }
 
+      if (coordinateIssues.length > 0) {
+        coordinateIssueRows.push(i);
+      }
+
       if (colIssues !== -1) {
         row[colIssues] = coordinateIssues.join('; ');
       }
@@ -362,6 +378,27 @@ export const buildProcessedWorkbook = async (
   }
 
   const outputSheet = XLSX.utils.aoa_to_sheet(updatedRows);
+
+  if (colXCoords !== -1 && colYCoords !== -1 && coordinateIssueRows.length > 0) {
+    for (const rowIndex of coordinateIssueRows) {
+      const styleRow = updatedStyles[rowIndex] || [];
+      for (const colIndex of [colXCoords, colYCoords]) {
+        const address = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+        const existing = outputSheet[address] as (XLSX.CellObject & { s?: unknown }) | undefined;
+        if (!existing) {
+          const baseStyle = styleRow[colIndex];
+          outputSheet[address] = {
+            t: 's',
+            v: '',
+            s: applyIssueHighlight(baseStyle)
+          } as XLSX.CellObject & { s?: unknown };
+          continue;
+        }
+        const baseStyle = styleRow[colIndex] ?? existing.s;
+        existing.s = applyIssueHighlight(baseStyle);
+      }
+    }
+  }
 
   // Preserve first-row grouped header formatting and second-row header colors.
   for (const rowIndex of [0, headerRowIndex]) {
