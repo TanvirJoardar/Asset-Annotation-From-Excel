@@ -49,6 +49,11 @@ This file tracks what has been developed in this project.
   - Applies the highlight directly on the output sheet so data rows are styled correctly.
   - Creates empty X/Y cells when blank so the highlight still appears.
 
+### Additional Update (Issues Button Shows Unidentified Levels)
+- Removed the separate "Show block names where level is Missing/Blank" button.
+- The Issues button now toggles the "Blocks With Unidentified Levels" card along with the processing issues panel.
+- File changed: `src/components/FileProcessingPanel.tsx`
+
 ### Additional Update (Toaster Anchored To Viewport Top-Right)
 - Fixed toast positioning so notifications appear at the screen top-right, not relative to the centered app container.
 - Root cause: toaster was mounted inside `.app-container.animate-fade-in`, and container transform context affected fixed positioning behavior.

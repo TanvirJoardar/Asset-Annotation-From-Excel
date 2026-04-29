@@ -52,6 +52,17 @@ export default function FileProcessingPanel({
     void onApplyConflictImageFixes();
   };
 
+  const handleToggleProcessingIssues = () => {
+    onToggleProcessingIssues();
+    if (showProcessingIssues) {
+      if (showLevelIssueBlocks) {
+        onToggleLevelIssueBlocks();
+      }
+    } else if (!showLevelIssueBlocks) {
+      onToggleLevelIssueBlocks();
+    }
+  };
+
   return (
     <div className="glass-panel animate-fade-in" style={{ padding: '2.5rem', marginBottom: '1.5rem' }}>
       {/* Header */}
@@ -134,7 +145,7 @@ export default function FileProcessingPanel({
             <button
               type="button"
               className={`issue-status-btn ${processingSummary.hasIssues ? 'has-issues' : 'no-issues'}`}
-              onClick={onToggleProcessingIssues}
+              onClick={handleToggleProcessingIssues}
               title="Show processing issue details"
               style={{
                 padding: '0.75rem 1.25rem',
@@ -209,6 +220,34 @@ export default function FileProcessingPanel({
             </div>
           </div>
 
+          {/* Valid Block Level */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05))',
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1.5rem',
+            transition: 'all 0.3s ease'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: 'var(--radius-md)',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#10b981'
+              }}>
+                <CheckSquare size={18} />
+              </div>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Block & Level Valid</span>
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #34d399, #10b981)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              {processingSummary.validBlockLevel}
+            </div>
+          </div>
+
           {/* Missing Block */}
           <div style={{
             background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05))',
@@ -245,8 +284,7 @@ export default function FileProcessingPanel({
             padding: '1.5rem',
             transition: 'all 0.3s ease'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
                 <div style={{
                   width: '36px',
                   height: '36px',
@@ -260,59 +298,17 @@ export default function FileProcessingPanel({
                   <Layers size={18} />
                 </div>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unidentified Level</span>
-              </div>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={onToggleLevelIssueBlocks}
-                style={{ 
-                  padding: '0.5rem', 
-                  minWidth: 'unset',
-                  borderRadius: 'var(--radius-sm)'
-                }}
-                title="Show block names where level is Missing/Blank"
-              >
-                <Ellipsis size={16} />
-              </button>
             </div>
             <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               {processingSummary.missingLevel}
             </div>
           </div>
-
-          {/* Valid Block Level */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05))',
-            border: '1px solid rgba(16, 185, 129, 0.2)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1.5rem',
-            transition: 'all 0.3s ease'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: 'var(--radius-md)',
-                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1))',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#10b981'
-              }}>
-                <CheckSquare size={18} />
-              </div>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Block & Level Valid</span>
-            </div>
-            <div style={{ fontSize: '2rem', fontWeight: 700, background: 'linear-gradient(135deg, #34d399, #10b981)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              {processingSummary.validBlockLevel}
-            </div>
-          </div>
         </div>
       )}
 
-      {isFileProcessed && showLevelIssueBlocks && (
+      {isFileProcessed && showProcessingIssues && showLevelIssueBlocks && (
         <div className="glass-panel" style={{ marginTop: '1rem', padding: '1rem' }}>
-          <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Blocks With Unidentified Levels</h3>
+          <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Blocks Where Level is Unidentified</h3>
           {processingSummary.blocksWithMissingOrBlankLevel.length === 0 ? (
             <p style={{ color: 'var(--text-secondary)' }}>No blocks found with Unidentified levels.</p>
           ) : (
