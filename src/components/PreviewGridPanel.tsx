@@ -68,9 +68,51 @@ function PreviewCard({ imagePath, annotations, handle, onOpen, options }: Previe
 
 const MemoPreviewCard = memo(PreviewCard);
 
+function CoordinateIssueCard({
+  imagePath,
+  pointsCount,
+  issueLabel
+}: {
+  imagePath: string;
+  pointsCount: number;
+  issueLabel: string;
+}) {
+  const fileName = getFileName(imagePath);
+  const folderPath = getFolderPath(imagePath);
+  const labelLines = issueLabel.split(' ');
+
+  return (
+    <div
+      className="preview-card coordinate-issue"
+      style={{ cursor: 'default' }}
+    >
+      <div className="preview-image-container" style={{ background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⚠️</div>
+          {labelLines.map((line) => (
+            <div key={line} style={{ fontSize: '0.85rem', fontWeight: '500' }}>{line}</div>
+          ))}
+        </div>
+      </div>
+      <div className="preview-footer">
+        <span className="preview-title" title={imagePath}>{fileName}</span>
+        <span className="preview-badge" style={{ background: 'rgba(168, 85, 247, 0.3)', color: '#d8b4fe' }}>{pointsCount} pts</span>
+      </div>
+      <div style={{ padding: '0 1rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+        {folderPath}
+      </div>
+    </div>
+  );
+}
+
+const MemoCoordinateIssueCard = memo(CoordinateIssueCard);
+
 interface PreviewGridPanelProps {
   dataMap: Map<string, Annotation[]>;
   imageHandles: Map<string, AppFileHandle>;
+  coordinateIssueKeys: Set<string>;
+  coordinateIssueCounts: Map<string, number>;
+  coordinateIssueLabels: Map<string, string>;
   options: RenderOptions;
   onReset: () => void;
   onEditOptions: () => void;
@@ -84,6 +126,9 @@ interface PreviewGridPanelProps {
 export default function PreviewGridPanel({
   dataMap,
   imageHandles,
+  coordinateIssueKeys,
+  coordinateIssueCounts,
+  coordinateIssueLabels,
   options,
   onReset,
   onEditOptions,
@@ -123,7 +168,39 @@ export default function PreviewGridPanel({
     return new Map(sortedBlocks);
   }, [dataMap]);
 
-  const blockTabs = useMemo(() => Array.from(groupedByBlock.keys()), [groupedByBlock]);
+  const coordinateIssuesByBlock = useMemo(() => {
+    const blockMap = new Map<string, Map<string, string[]>>();
+
+    for (const imagePath of coordinateIssueKeys) {
+      const blockName = getBlockName(imagePath);
+      const floorName = getFloorName(imagePath);
+      const floors = blockMap.get(blockName) ?? new Map<string, string[]>();
+      const images = floors.get(floorName) ?? [];
+
+      images.push(imagePath);
+      floors.set(floorName, images.sort());
+      blockMap.set(blockName, floors);
+    }
+
+    const sortedBlocks = Array.from(blockMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([blockName, floors]) => {
+        const sortedFloors = Array.from(floors.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([floorName, items]) => [floorName, items] as [string, string[]]);
+
+        return [blockName, new Map(sortedFloors)] as [string, Map<string, string[]>];
+      });
+
+    return new Map(sortedBlocks);
+  }, [coordinateIssueKeys]);
+
+  const blockTabs = useMemo(() => {
+    return Array.from(new Set([
+      ...groupedByBlock.keys(),
+      ...coordinateIssuesByBlock.keys()
+    ])).sort((a, b) => a.localeCompare(b));
+  }, [coordinateIssuesByBlock, groupedByBlock]);
   const [activeBlock, setActiveBlock] = useState<string | null>(null);
 
   useEffect(() => {
@@ -132,13 +209,23 @@ export default function PreviewGridPanel({
       return;
     }
 
-    if (!activeBlock || !groupedByBlock.has(activeBlock)) {
+    if (!activeBlock || !blockTabs.includes(activeBlock)) {
       setActiveBlock(blockTabs[0]);
     }
-  }, [activeBlock, blockTabs, groupedByBlock]);
+  }, [activeBlock, blockTabs]);
 
   const selectedFloors = activeBlock ? groupedByBlock.get(activeBlock) : undefined;
-  const selectedFloorEntries = selectedFloors ? Array.from(selectedFloors.entries()) : [];
+  const selectedIssueFloors = activeBlock ? coordinateIssuesByBlock.get(activeBlock) : undefined;
+  const selectedFloorEntries = useMemo(() => {
+    const floorNames = new Set<string>();
+
+    selectedFloors?.forEach((_, floorName) => floorNames.add(floorName));
+    selectedIssueFloors?.forEach((_, floorName) => floorNames.add(floorName));
+
+    return Array.from(floorNames)
+      .sort((a, b) => a.localeCompare(b))
+      .map((floorName) => [floorName, selectedFloors?.get(floorName) ?? []] as [string, Array<[string, Annotation[]]>]);
+  }, [selectedFloors, selectedIssueFloors]);
   const isSingleLevel = selectedFloorEntries.length === 1;
 
   return (
@@ -193,25 +280,42 @@ export default function PreviewGridPanel({
           ))}
         </div>
 
-        {selectedFloors && (
+        {selectedFloorEntries.length > 0 && (
           <div className={`preview-level-columns ${isSingleLevel ? 'single-level' : ''}`} role="list" aria-label="Levels">
-            {selectedFloorEntries.map(([floorName, items]) => (
-              <div key={floorName} className="preview-level-column" role="listitem">
-                <h3 style={{ marginBottom: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>{floorName}</h3>
-                <div className="preview-level-images" role="list" aria-label={`Images for ${floorName}`}>
-                  {items.map(([imagePath, annotations]) => (
-                    <MemoPreviewCard
-                      key={imagePath}
-                      imagePath={imagePath}
-                      annotations={annotations}
-                      handle={imageHandles.get(imagePath)}
-                      onOpen={onOpenPreview}
-                      options={options}
-                    />
-                  ))}
+            {selectedFloorEntries.map(([floorName, items]) => {
+              const issueItems = selectedIssueFloors?.get(floorName) ?? [];
+              const hasAnyItems = items.length > 0 || issueItems.length > 0;
+              
+              if (!hasAnyItems) {
+                return null;
+              }
+
+              return (
+                <div key={floorName} className="preview-level-column" role="listitem">
+                  <h3 style={{ marginBottom: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.95rem' }}>{floorName}</h3>
+                  <div className="preview-level-images" role="list" aria-label={`Images for ${floorName}`}>
+                    {items.map(([imagePath, annotations]) => (
+                      <MemoPreviewCard
+                        key={imagePath}
+                        imagePath={imagePath}
+                        annotations={annotations}
+                        handle={imageHandles.get(imagePath)}
+                        onOpen={onOpenPreview}
+                        options={options}
+                      />
+                    ))}
+                    {issueItems.map((imagePath) => (
+                      <MemoCoordinateIssueCard
+                        key={imagePath}
+                        imagePath={imagePath}
+                        pointsCount={coordinateIssueCounts.get(imagePath) ?? 0}
+                        issueLabel={coordinateIssueLabels.get(imagePath) ?? 'Coordinates Missing'}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

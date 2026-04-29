@@ -33,6 +33,9 @@ export default function App() {
     stats,
     dataMap,
     imageHandles,
+    coordinateIssueKeys,
+    coordinateIssueCounts,
+    coordinateIssueLabels,
     resetApp,
     editOptions,
     exportZip,
@@ -86,6 +89,9 @@ export default function App() {
           <PreviewGridPanel
             dataMap={dataMap}
             imageHandles={imageHandles}
+            coordinateIssueKeys={coordinateIssueKeys}
+            coordinateIssueCounts={coordinateIssueCounts}
+            coordinateIssueLabels={coordinateIssueLabels}
             options={options}
             onReset={resetApp}
             onEditOptions={editOptions}

@@ -2,6 +2,25 @@
 
 This file tracks what has been developed in this project.
 
+## 2026-04-25
+
+### Additional Update (Display Levels with Missing Coordinates)
+- Implemented display of levels that have all coordinates missing in the preview grid.
+- Levels with zero valid annotations (all coordinates invalid) are now collected during annotation extraction.
+- These "coordinate-issue" groups are displayed as special cards in their respective block/level columns with:
+  - Purple gradient background indicating the issue
+  - Warning icon (⚠️) with "Coordinates Missing" label
+  - "Issue" badge with purple styling
+  - Non-interactive cards (no preview or zoom)
+- Files changed:
+  - `src/hooks/useAssetAnnotationWorkflow.ts`: Added `coordinateIssueKeys` state to track coordinate-issue output paths; populated from `annotationData.coordinateIssueGroups` during annotation extraction
+  - `src/components/PreviewGridPanel.tsx`: Added `coordinateIssuesByBlock` memoization to organize issue groups by block/level; created `CoordinateIssueCard` component for rendering; updated level rendering to include coordinate-issue cards alongside normal preview cards
+  - `src/App.tsx`: Added `coordinateIssueKeys` to hook destructuring and passed it to `PreviewGridPanel`
+- User benefit: Provides complete visibility into all levels, including those with data quality issues, helping users identify which levels need attention.
+- Validation status:
+  - `npm run build` passes
+  - No TypeScript errors
+
 ## 2026-04-24
 
 ### Additional Update (Toast Notifications + Permission Confirmation Modal)

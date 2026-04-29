@@ -277,6 +277,9 @@ export function useAssetAnnotationWorkflow() {
   const [isProcessed, setIsProcessed] = useState(false);
   const [dataMap, setDataMap] = useState<Map<string, Annotation[]>>(new Map());
   const [imageHandles, setImageHandles] = useState<Map<string, AppFileHandle>>(new Map());
+  const [coordinateIssueKeys, setCoordinateIssueKeys] = useState<Set<string>>(new Set());
+  const [coordinateIssueCounts, setCoordinateIssueCounts] = useState<Map<string, number>>(new Map());
+  const [coordinateIssueLabels, setCoordinateIssueLabels] = useState<Map<string, string>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgressPercent, setExportProgressPercent] = useState(0);
@@ -325,6 +328,9 @@ export function useAssetAnnotationWorkflow() {
     setIsProcessed(false);
     setDataMap(new Map());
     setImageHandles(new Map());
+    setCoordinateIssueKeys(new Set());
+    setCoordinateIssueCounts(new Map());
+    setCoordinateIssueLabels(new Map());
     setStats({ excelFiles: 0, annotationsFound: 0, distinctImages: 0 });
   }, []);
 
@@ -510,6 +516,9 @@ export function useAssetAnnotationWorkflow() {
 
       const nextDataMap = new Map<string, Annotation[]>();
       const nextImageHandles = new Map<string, AppFileHandle>();
+      const coordinateIssueKeysSet = new Set<string>();
+      const coordinateIssueCountsMap = new Map<string, number>();
+      const coordinateIssueLabelsMap = new Map<string, string>();
 
       const sortedGroups = Array.from(annotationData.groupedAnnotations.values()).sort((a, b) => {
         const aKey = `${a.block}/${a.level}/${a.imageName}`.toLowerCase();
@@ -537,6 +546,40 @@ export function useAssetAnnotationWorkflow() {
         }
       }
 
+      for (const issueGroup of annotationData.coordinateIssueGroups) {
+        const matchedImage = pickImageForGroup(availableImageFiles, issueGroup.block, issueGroup.level, issueGroup.imageName);
+        const { block: resolvedBlock, level: resolvedLevel } = resolveBlockAndLevel(
+          issueGroup.block,
+          issueGroup.level,
+          issueGroup.imageName,
+          matchedImage?.path
+        );
+        const outputPath = buildOutputPath(
+          resolvedBlock,
+          resolvedLevel,
+          matchedImage ? matchedImage.path : issueGroup.imageName
+        );
+        coordinateIssueKeysSet.add(outputPath);
+        coordinateIssueCountsMap.set(outputPath, issueGroup.invalidCount);
+        coordinateIssueLabelsMap.set(outputPath, 'Coordinates Missing');
+      }
+
+      for (const issueGroup of annotationData.backgroundImageIssueGroups) {
+        const { block: resolvedBlock, level: resolvedLevel } = resolveBlockAndLevel(
+          issueGroup.block,
+          issueGroup.level,
+          issueGroup.imageName
+        );
+        const outputPath = buildOutputPath(
+          resolvedBlock,
+          resolvedLevel,
+          issueGroup.imageName
+        );
+        coordinateIssueKeysSet.add(outputPath);
+        coordinateIssueCountsMap.set(outputPath, issueGroup.missingCount);
+        coordinateIssueLabelsMap.set(outputPath, 'Background Image Name Missing');
+      }
+
       setDataMap(nextDataMap);
 
       if (annotationData.invalidCoordsCount > 0) {
@@ -557,10 +600,13 @@ export function useAssetAnnotationWorkflow() {
       setStats({
         excelFiles: 1,
         annotationsFound: annotationData.annotationsFound,
-        distinctImages: nextDataMap.size
+        distinctImages: new Set([...nextDataMap.keys(), ...coordinateIssueKeysSet]).size
       });
 
       setImageHandles(nextImageHandles);
+      setCoordinateIssueKeys(coordinateIssueKeysSet);
+      setCoordinateIssueCounts(coordinateIssueCountsMap);
+      setCoordinateIssueLabels(coordinateIssueLabelsMap);
       setIsProcessed(true);
       toast.success('Annotation groups prepared successfully.');
     } catch (e) {
@@ -710,6 +756,9 @@ export function useAssetAnnotationWorkflow() {
     stats,
     dataMap,
     imageHandles,
+    coordinateIssueKeys,
+    coordinateIssueCounts,
+    coordinateIssueLabels,
     resetApp,
     editOptions,
     exportZip,

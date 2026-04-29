@@ -244,6 +244,7 @@ export const buildProcessedWorkbook = async (
     blockName: string;
     levelName: string;
     imageNameMap: Map<string, { imageName: string; count: number }>;
+    blankCount: number;
     rowIndexes: number[];
   }>();
 
@@ -350,19 +351,22 @@ export const buildProcessedWorkbook = async (
     if (colBackgroundImage !== -1) {
       const conflictKey = `${block.toLowerCase()}|${level.toLowerCase()}`;
       const selectedImageFix = options.backgroundImageFixByBlockLevel?.[conflictKey];
-      if (selectedImageFix && normalize(row[colBackgroundImage])) {
+      if (selectedImageFix) {
         row[colBackgroundImage] = selectedImageFix;
       }
 
       const imageName = normalize(row[colBackgroundImage]);
-      if (imageName) {
-        const existing = blockLevelImageMap.get(conflictKey) ?? {
-          blockName: block,
-          levelName: level,
-          imageNameMap: new Map<string, { imageName: string; count: number }>(),
-          rowIndexes: [] as number[]
-        };
+      const existing = blockLevelImageMap.get(conflictKey) ?? {
+        blockName: block,
+        levelName: level,
+        imageNameMap: new Map<string, { imageName: string; count: number }>(),
+        blankCount: 0,
+        rowIndexes: [] as number[]
+      };
 
+      existing.rowIndexes.push(i);
+
+      if (imageName) {
         const imageKey = imageName.toLowerCase();
         const imageEntry = existing.imageNameMap.get(imageKey);
         if (!imageEntry) {
@@ -371,9 +375,11 @@ export const buildProcessedWorkbook = async (
           imageEntry.count += 1;
           existing.imageNameMap.set(imageKey, imageEntry);
         }
-        existing.rowIndexes.push(i);
-        blockLevelImageMap.set(conflictKey, existing);
+      } else {
+        existing.blankCount += 1;
       }
+
+      blockLevelImageMap.set(conflictKey, existing);
     }
   }
 
@@ -473,7 +479,7 @@ export const buildProcessedWorkbook = async (
   }
 
   const blockLevelBackgroundImageConflicts = Array.from(blockLevelImageMap.values())
-    .filter((entry) => entry.imageNameMap.size > 1)
+    .filter((entry) => entry.imageNameMap.size > 1 || (entry.blankCount > 0 && entry.imageNameMap.size > 0))
     .map((entry) => ({
       blockName: entry.blockName,
       levelName: entry.levelName,
@@ -545,6 +551,18 @@ export interface AnnotationExtractionResult {
     imageName: string;
     annotations: Annotation[];
   }>;
+  coordinateIssueGroups: Array<{
+    block: string;
+    level: string;
+    imageName: string;
+    invalidCount: number;
+  }>;
+  backgroundImageIssueGroups: Array<{
+    block: string;
+    level: string;
+    imageName: string;
+    missingCount: number;
+  }>;
   annotationsFound: number;
   invalidCoordsCount: number;
   invalidExamples: string[];
@@ -610,12 +628,12 @@ export const checkRequiredProcessingColumns = async (
 
   const headers = rawRows[headerRowIndex] || [];
 
-  const colLocationDescriptor = headers.findIndex((h) => normalize(h).toLowerCase() === 'location descriptor');
-  const colSensorId = headers.findIndex((h) => normalize(h).toLowerCase() === 'sensor id');
-  const colSensorDisplayName = headers.findIndex((h) => /display\s*name/i.test(normalize(h)));
+  const colLocationDescriptor = headers.findIndex((h) => normalizeHeaderKey(h) === 'location descriptor');
+  const colSensorId = headers.findIndex((h) => normalizeHeaderKey(h) === 'sensor id');
+  const colSensorDisplayName = headers.findIndex((h) => normalizeHeaderKey(h) === 'sensor display name');
   const colXCoords = headers.findIndex((h) => isXCoordsHeader(h));
   const colYCoords = headers.findIndex((h) => isYCoordsHeader(h));
-  const colImage = headers.findIndex((h) => normalize(h) === 'Background Image Name');
+  const colImage = headers.findIndex((h) => normalizeHeaderKey(h) === 'background image name');
 
   const hasLocationDescriptor = colLocationDescriptor !== -1;
   const hasSensorId = colSensorId !== -1;
@@ -758,6 +776,19 @@ export const extractAnnotationsFromWorkbook = async (
     imageName: string;
     annotations: Annotation[];
   }>();
+  const groupStats = new Map<string, {
+    block: string;
+    level: string;
+    imageName: string;
+    validCount: number;
+    invalidCount: number;
+  }>();
+  const backgroundImageIssueStats = new Map<string, {
+    block: string;
+    level: string;
+    imageName: string;
+    missingCount: number;
+  }>();
   let annotationsFound = 0;
   let invalidCoordsCount = 0;
   const invalidExamples: string[] = [];
@@ -775,13 +806,6 @@ export const extractAnnotationsFromWorkbook = async (
     const yCoords = row[colYCoords];
     const imageName = row[colImage];
 
-    if ((!normalize(xCoords) && !normalize(yCoords)) || !imageName) {
-      continue;
-    }
-
-    const cleanedImageName = normalize(imageName);
-    const parsed = parseCoordinates(xCoords, yCoords);
-
     const descriptor = colLocationDescriptor !== -1 ? row[colLocationDescriptor] : '';
     const parsedFromDescriptor = parseBlockAndLevel(descriptor);
 
@@ -797,10 +821,40 @@ export const extractAnnotationsFromWorkbook = async (
         : (colLevel !== -1 ? row[colLevel] : parsedFromDescriptor.level)
     ) || parsedFromDescriptor.level;
 
+    const cleanedImageName = normalize(imageName);
+
+    if (!cleanedImageName) {
+      const missingImageKey = `${resolvedBlock.toLowerCase()}|${resolvedLevel.toLowerCase()}|missing-background-image`;
+
+      if (!backgroundImageIssueStats.has(missingImageKey)) {
+        backgroundImageIssueStats.set(missingImageKey, {
+          block: resolvedBlock,
+          level: resolvedLevel,
+          imageName: 'Background Image Name Missing',
+          missingCount: 0
+        });
+      }
+
+      backgroundImageIssueStats.get(missingImageKey)!.missingCount += 1;
+      continue;
+    }
+
+    const parsed = parseCoordinates(xCoords, yCoords);
     const groupKey = `${resolvedBlock.toLowerCase()}|${resolvedLevel.toLowerCase()}|${cleanedImageName.toLowerCase()}`;
+
+    if (!groupStats.has(groupKey)) {
+      groupStats.set(groupKey, {
+        block: resolvedBlock,
+        level: resolvedLevel,
+        imageName: cleanedImageName,
+        validCount: 0,
+        invalidCount: 0
+      });
+    }
 
     if (!parsed) {
       invalidCoordsCount++;
+      groupStats.get(groupKey)!.invalidCount += 1;
       invalidCoordinates.push({
         rowNumber: i + 1,
         coordinate: `X: ${normalize(xCoords)}, Y: ${normalize(yCoords)}`
@@ -810,6 +864,8 @@ export const extractAnnotationsFromWorkbook = async (
       }
       continue;
     }
+
+    groupStats.get(groupKey)!.validCount += 1;
 
     if (!groupedAnnotations.has(groupKey)) {
       groupedAnnotations.set(groupKey, {
@@ -830,8 +886,27 @@ export const extractAnnotationsFromWorkbook = async (
     annotationsFound++;
   }
 
+  const coordinateIssueGroups = Array.from(groupStats.values())
+    .filter((group) => group.validCount === 0 && group.invalidCount > 0)
+    .map((group) => ({
+      block: group.block,
+      level: group.level,
+      imageName: group.imageName,
+      invalidCount: group.invalidCount
+    }));
+  const backgroundImageIssueGroups = Array.from(backgroundImageIssueStats.values())
+    .filter((group) => group.missingCount > 0)
+    .map((group) => ({
+      block: group.block,
+      level: group.level,
+      imageName: group.imageName,
+      missingCount: group.missingCount
+    }));
+
   return {
     groupedAnnotations,
+    coordinateIssueGroups,
+    backgroundImageIssueGroups,
     annotationsFound,
     invalidCoordsCount,
     invalidExamples,
