@@ -34,6 +34,9 @@ For the application to correctly map your coordinates to the background images, 
 * **`Processed Level`**: The specific floor/level name (helps organize output).
 * **`Location Descriptor`**: A combined string (e.g., `Room_BlockA_L1`). Note: The app requires the `Location Descriptor` column so the **Data Processing** phase can generate the processed block and level columns.
 
+### Generated Columns (After Processing)
+* **`Issues`**: Added after processing. Lists row-level coordinate problems (e.g., blank X/Y, one coordinate missing, multiple values, or zero values). Empty means no detected coordinate issues for that row.
+
 ### Optional Columns
 * **`Sensor Id`**: A unique identifier. Used as the label text drawn on the image next to the marker if labels are enabled.
 * **`Display Name`**: An alternative string that can be used for label text alongside/instead of the Sensor ID.
