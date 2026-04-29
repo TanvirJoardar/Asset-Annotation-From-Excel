@@ -32,7 +32,15 @@ For the application to correctly map your coordinates to the background images, 
 * **`Background Image Name`**: The exact filename of the local image (e.g., `Floor1_Plan.png` or just `Floor1_Plan`) to draw this coordinate on.
 * **`Processed Block`**: The specific building/block name (helps organize output).
 * **`Processed Level`**: The specific floor/level name (helps organize output).
-* **`Location Descriptor`**: A combined string (e.g., `Room_BlockA_L1`). Note: The app requires the `Location Descriptor` column so the **Data Processing** phase can generate the processed block and level columns.
+* **`Location Descriptor`**: A combined string with underscore-delimited segments. The app parses it as:
+   - **Processed Block** = the **second segment**.
+   - **Processed Level** = the **last segment** if it contains a level token like `L03` or `B2`; otherwise it uses the **second-to-last segment**.
+
+   Examples:
+   - `Tengah C1_235A_L03 UP_Staircase 1` → `Processed Block = 235A`, `Processed Level = L03` (from the second-to-last segment).
+   - `Tengah C1_235A_L03 UP_L13 CORRIDOR` → `Processed Block = 235A`, `Processed Level = L13` (from the last segment).
+
+   The app requires the `Location Descriptor` column so the **Data Processing** phase can generate the processed block and level columns.
 
 ### Generated Columns (After Processing)
 * **`Issues`**: Added after processing. Lists row-level coordinate problems (e.g., blank X/Y, one coordinate missing, multiple values, or zero values). Empty means no detected coordinate issues for that row.
