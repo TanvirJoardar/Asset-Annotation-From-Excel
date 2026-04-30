@@ -83,6 +83,8 @@ const extractBlockAndLevelFromOutputPath = (outputPath: string): { block: string
   return { block, level };
 };
 
+const shouldExportBlock = (block: string): boolean => normalizeText(block).toLowerCase() !== 'unassigned block';
+
 const resolveBlockAndLevel = (
   block: string,
   level: string,
@@ -649,7 +651,14 @@ export function useAssetAnnotationWorkflow() {
 
     try {
       const zip = new JSZip();
-      const entries = Array.from(dataMap.entries()).filter(([imgName]) => imageHandles.has(imgName));
+      const entries = Array.from(dataMap.entries()).filter(([imgName]) => {
+        if (!imageHandles.has(imgName)) {
+          return false;
+        }
+
+        const { block } = extractBlockAndLevelFromOutputPath(imgName);
+        return shouldExportBlock(block);
+      });
       const total = entries.length;
       const maxWorkers = Math.max(1, Math.min(2, (typeof navigator !== 'undefined' ? Math.floor((navigator.hardwareConcurrency || 4) / 3) : 2)));
 
