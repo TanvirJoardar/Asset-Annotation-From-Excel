@@ -7,6 +7,7 @@ import { collectExcelAndImageHandles } from '../utils/fileDiscovery';
 import {
   buildProcessedWorkbook,
   extractAnnotationsFromWorkbook,
+  checkAnnotationBackgroundImageConflicts,
   checkRequiredAnnotationColumns,
   checkRequiredProcessingColumns
 } from '../utils/workbookProcessing';
@@ -511,6 +512,13 @@ export function useAssetAnnotationWorkflow() {
         
         if (columnCheck.missingColumns.length > 0) {
           toast.error(`Missing required columns: \n${'- ' + columnCheck.missingColumns.join(', \n- ')}. \n\nPlease process the file first or ensure all required columns exist.`);
+          setIsProcessing(false);
+          return;
+        }
+
+        const backgroundImageConflicts = await checkAnnotationBackgroundImageConflicts(originalFile);
+        if (backgroundImageConflicts.length > 0) {
+          toast.error('Cannot start annotation: Multiple background image conflicts were detected in the same level. \n\nPlease fix the conflicts.');
           setIsProcessing(false);
           return;
         }

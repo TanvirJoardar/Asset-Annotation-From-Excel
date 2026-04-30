@@ -134,6 +134,89 @@ interface ProcessWorkbookOptions {
   backgroundImageFixByBlockLevel?: Record<string, string>;
 }
 
+const collectBlockLevelBackgroundImageConflicts = (
+  rows: unknown[][],
+  colLocationDescriptor: number,
+  colBackgroundImage: number,
+  selectedFixes?: Record<string, string>
+): ProcessingSummary['blockLevelBackgroundImageConflicts'] => {
+  const blockLevelImageMap = new Map<string, {
+    blockName: string;
+    levelName: string;
+    imageNameMap: Map<string, { imageName: string; count: number }>;
+    blankCount: number;
+    rowIndexes: number[];
+  }>();
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!Array.isArray(row) || row.length === 0) {
+      continue;
+    }
+
+    const sourceHasContent = row.some((cell) => normalize(cell) !== '');
+    if (!sourceHasContent) {
+      continue;
+    }
+
+    const descriptor = colLocationDescriptor === -1 ? '' : row[colLocationDescriptor];
+    const { block, level } = parseBlockAndLevel(descriptor);
+    const conflictKey = `${block.toLowerCase()}|${level.toLowerCase()}`;
+    const hasSelectedImageFix = Object.prototype.hasOwnProperty.call(selectedFixes ?? {}, conflictKey);
+    const selectedImageFix = selectedFixes?.[conflictKey] ?? '';
+    const imageName = normalize(hasSelectedImageFix ? selectedImageFix : row[colBackgroundImage]);
+    const existing = blockLevelImageMap.get(conflictKey) ?? {
+      blockName: block,
+      levelName: level,
+      imageNameMap: new Map<string, { imageName: string; count: number }>(),
+      blankCount: 0,
+      rowIndexes: [] as number[]
+    };
+
+    existing.rowIndexes.push(i);
+
+    if (imageName) {
+      const imageKey = imageName.toLowerCase();
+      const imageEntry = existing.imageNameMap.get(imageKey);
+      if (!imageEntry) {
+        existing.imageNameMap.set(imageKey, { imageName, count: 1 });
+      } else {
+        imageEntry.count += 1;
+        existing.imageNameMap.set(imageKey, imageEntry);
+      }
+    } else {
+      existing.blankCount += 1;
+    }
+
+    blockLevelImageMap.set(conflictKey, existing);
+  }
+
+  return Array.from(blockLevelImageMap.values())
+    .filter((entry) => normalize(entry.blockName).toLowerCase() !== 'blank')
+    .filter((entry) => entry.imageNameMap.size > 1 || (entry.blankCount > 0 && entry.imageNameMap.size > 0))
+    .map((entry) => ({
+      blockName: entry.blockName,
+      levelName: entry.levelName,
+      imageStats: [
+        ...Array.from(entry.imageNameMap.values()),
+        ...(entry.blankCount > 0 ? [{ imageName: '', count: entry.blankCount }] : [])
+      ].sort((a, b) => {
+        if (!a.imageName && b.imageName) {
+          return 1;
+        }
+        if (a.imageName && !b.imageName) {
+          return -1;
+        }
+        if (b.count !== a.count) {
+          return b.count - a.count;
+        }
+        return a.imageName.localeCompare(b.imageName);
+      }),
+      affectedRows: entry.rowIndexes.length
+    }))
+    .sort((a, b) => `${a.blockName}|${a.levelName}`.localeCompare(`${b.blockName}|${b.levelName}`));
+};
+
 export const buildProcessedWorkbook = async (
   inputFile: File,
   options: ProcessWorkbookOptions = {}
@@ -240,14 +323,6 @@ export const buildProcessedWorkbook = async (
   const coordinateInvalidBlankOrZeroRows = new Set<number>();
   const coordinateIssueRows: number[] = [];
   const blocksWithMissingOrBlankLevelMap = new Map<string, { missingCount: number; blankCount: number }>();
-  const blockLevelImageMap = new Map<string, {
-    blockName: string;
-    levelName: string;
-    imageNameMap: Map<string, { imageName: string; count: number }>;
-    blankCount: number;
-    rowIndexes: number[];
-  }>();
-
   for (let i = headerRowIndex + 1; i < updatedRows.length; i++) {
     const row = updatedRows[i];
     const sourceRow = jsonRaw[i];
@@ -358,32 +433,6 @@ export const buildProcessedWorkbook = async (
       if (hasSelectedImageFix) {
         row[colBackgroundImage] = selectedImageFix;
       }
-
-      const imageName = normalize(row[colBackgroundImage]);
-      const existing = blockLevelImageMap.get(conflictKey) ?? {
-        blockName: block,
-        levelName: level,
-        imageNameMap: new Map<string, { imageName: string; count: number }>(),
-        blankCount: 0,
-        rowIndexes: [] as number[]
-      };
-
-      existing.rowIndexes.push(i);
-
-      if (imageName) {
-        const imageKey = imageName.toLowerCase();
-        const imageEntry = existing.imageNameMap.get(imageKey);
-        if (!imageEntry) {
-          existing.imageNameMap.set(imageKey, { imageName, count: 1 });
-        } else {
-          imageEntry.count += 1;
-          existing.imageNameMap.set(imageKey, imageEntry);
-        }
-      } else {
-        existing.blankCount += 1;
-      }
-
-      blockLevelImageMap.set(conflictKey, existing);
     }
   }
 
@@ -482,31 +531,12 @@ export const buildProcessedWorkbook = async (
     outputSheet['!merges'] = transformedMerges;
   }
 
-  const blockLevelBackgroundImageConflicts = Array.from(blockLevelImageMap.values())
-    .filter((entry) => normalize(entry.blockName).toLowerCase() !== 'blank')
-    .filter((entry) => entry.imageNameMap.size > 1 || (entry.blankCount > 0 && entry.imageNameMap.size > 0))
-    .map((entry) => ({
-      blockName: entry.blockName,
-      levelName: entry.levelName,
-      imageStats: [
-        ...Array.from(entry.imageNameMap.values()),
-        ...(entry.blankCount > 0 ? [{ imageName: '', count: entry.blankCount }] : [])
-      ].sort((a, b) => {
-        if (!a.imageName && b.imageName) {
-          return 1;
-        }
-        if (a.imageName && !b.imageName) {
-          return -1;
-        }
-        if (b.count !== a.count) {
-          return b.count - a.count;
-        }
-        return a.imageName.localeCompare(b.imageName);
-      }),
-      affectedRows: entry.rowIndexes.length,
-      rowIndexes: entry.rowIndexes
-    }))
-    .sort((a, b) => `${a.blockName}|${a.levelName}`.localeCompare(`${b.blockName}|${b.levelName}`));
+  const blockLevelBackgroundImageConflicts = collectBlockLevelBackgroundImageConflicts(
+    updatedRows.slice(headerRowIndex + 1),
+    colLocationDescriptor,
+    colBackgroundImage,
+    options.backgroundImageFixByBlockLevel
+  );
 
   const outputWorkbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(outputWorkbook, outputSheet, firstSheetName || 'Sheet1');
@@ -538,12 +568,7 @@ export const buildProcessedWorkbook = async (
           + coordinateMoreThanTwoValuesCount
           + coordinateZeroValueCount
       },
-      blockLevelBackgroundImageConflicts: blockLevelBackgroundImageConflicts.map((item) => ({
-        blockName: item.blockName,
-        levelName: item.levelName,
-        imageStats: item.imageStats,
-        affectedRows: item.affectedRows
-      })),
+      blockLevelBackgroundImageConflicts,
       hasIssues:
         coordinateBlankCount + coordinateSingleValueCount + coordinateMoreThanTwoValuesCount + coordinateZeroValueCount > 0
         || blockLevelBackgroundImageConflicts.length > 0,
@@ -556,6 +581,39 @@ export const buildProcessedWorkbook = async (
         .sort((a, b) => a.blockName.localeCompare(b.blockName))
     }
   };
+};
+
+export const checkAnnotationBackgroundImageConflicts = async (
+  inputFile: File
+): Promise<ProcessingSummary['blockLevelBackgroundImageConflicts']> => {
+  const arrayBuffer = await inputFile.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+  const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as unknown[][];
+
+  if (rawRows.length === 0) {
+    return [];
+  }
+
+  const headerRowIndex = resolveHeaderRowIndex(rawRows);
+  if (headerRowIndex === -1) {
+    return [];
+  }
+
+  const headers = rawRows[headerRowIndex] || [];
+  const colLocationDescriptor = headers.findIndex((h) => normalizeHeaderKey(h) === 'location descriptor');
+  const colBackgroundImage = headers.findIndex((h) => normalizeHeaderKey(h) === 'background image name');
+
+  if (colBackgroundImage === -1) {
+    return [];
+  }
+
+  return collectBlockLevelBackgroundImageConflicts(
+    rawRows.slice(headerRowIndex + 1),
+    colLocationDescriptor,
+    colBackgroundImage
+  );
 };
 
 export interface AnnotationExtractionResult {
