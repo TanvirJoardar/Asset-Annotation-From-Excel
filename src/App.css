@@ -1216,7 +1216,7 @@ select::-ms-expand {
   border-color: var(--error);
 }
 
-.preview-card.missing:after {
+/* .preview-card.missing:after {
   content: "Image Missing in Folder";
   position: absolute;
   top: 50%;
@@ -1225,7 +1225,7 @@ select::-ms-expand {
   color: var(--error);
   font-weight: 600;
   text-align: center;
-}
+} */
 
 .preview-image-container {
   width: 100%;

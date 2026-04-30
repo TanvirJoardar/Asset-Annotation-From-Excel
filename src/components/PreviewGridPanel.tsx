@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react';
-import { Download, Loader2, RefreshCw, Settings2 } from 'lucide-react';
+import { Crosshair, Download, FileImage, FolderX, ImageOff, Loader2, RefreshCw, Settings2, TriangleAlert, type LucideIcon } from 'lucide-react';
 import PreviewCanvas from './PreviewCanvas';
 import type { Annotation, AppFileHandle, RenderOptions } from '../types';
 
@@ -33,6 +33,58 @@ const getBlockName = (path: string): string => {
 
 const shouldShowBlock = (blockName: string): boolean => blockName.toLowerCase() !== 'unassigned block';
 
+const getIssueCardVisual = (issueLabel: string): {
+  Icon: LucideIcon;
+  accentColor: string;
+  accentBackground: string;
+  cardBackground: string;
+} => {
+  const normalized = issueLabel.toLowerCase();
+
+  if (normalized === 'missing folder') {
+    return {
+      Icon: FolderX,
+      accentColor: '#fb923c',
+      accentBackground: 'rgba(249, 115, 22, 0.22)',
+      cardBackground: 'linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(154, 52, 18, 0.18))'
+    };
+  }
+
+  if (normalized === 'image missing') {
+    return {
+      Icon: ImageOff,
+      accentColor: '#fda4af',
+      accentBackground: 'rgba(244, 63, 94, 0.22)',
+      cardBackground: 'linear-gradient(135deg, rgba(244, 63, 94, 0.18), rgba(127, 29, 29, 0.16))'
+    };
+  }
+
+  if (normalized === 'background image name missing') {
+    return {
+      Icon: FileImage,
+      accentColor: '#67e8f9',
+      accentBackground: 'rgba(6, 182, 212, 0.22)',
+      cardBackground: 'linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(8, 47, 73, 0.18))'
+    };
+  }
+
+  if (normalized === 'coordinates missing') {
+    return {
+      Icon: Crosshair,
+      accentColor: '#fcd34d',
+      accentBackground: 'rgba(245, 158, 11, 0.22)',
+      cardBackground: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(120, 53, 15, 0.18))'
+    };
+  }
+
+  return {
+    Icon: TriangleAlert,
+    accentColor: '#d8b4fe',
+    accentBackground: 'rgba(168, 85, 247, 0.24)',
+    cardBackground: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.2))'
+  };
+};
+
 const getFloorName = (path: string): string => {
   const segments = getPathSegments(path);
   if (segments.length <= 2) {
@@ -45,6 +97,7 @@ function PreviewCard({ imagePath, annotations, handle, onOpen, options }: Previe
   const isMissing = !handle;
   const fileName = getFileName(imagePath);
   const folderPath = getFolderPath(imagePath);
+  const missingVisual = getIssueCardVisual('Image Missing');
 
   return (
     <div
@@ -54,9 +107,37 @@ function PreviewCard({ imagePath, annotations, handle, onOpen, options }: Previe
       }}
       style={{ cursor: isMissing ? 'default' : 'pointer' }}
     >
-      <div className="preview-image-container">
-        <PreviewCanvas fileHandle={handle} annotations={annotations} options={options} />
-      </div>
+      {isMissing ? (
+        <div
+          className="preview-image-container"
+          style={{ background: missingVisual.cardBackground, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+            <div
+              style={{
+                width: '3.25rem',
+                height: '3.25rem',
+                margin: '0 auto 0.65rem',
+                borderRadius: '999px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: missingVisual.accentBackground,
+                color: missingVisual.accentColor
+              }}
+            >
+              <missingVisual.Icon size={28} strokeWidth={2.2} />
+            </div>
+            <div style={{ fontSize: '0.95rem', fontWeight: '500', lineHeight: 1.2, maxWidth: '8.5rem' }}>
+              Image Missing in Folder
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="preview-image-container">
+          <PreviewCanvas fileHandle={handle} annotations={annotations} options={options} />
+        </div>
+      )}
       <div className="preview-footer">
         <span className="preview-title" title={imagePath}>{fileName}</span>
         <span className={`preview-badge ${isMissing ? 'missing' : ''}`}>{annotations.length} pts</span>
@@ -81,24 +162,41 @@ function CoordinateIssueCard({
 }) {
   const fileName = getFileName(imagePath);
   const folderPath = getFolderPath(imagePath);
-  const labelLines = issueLabel.split(' ');
+  const { Icon, accentColor, accentBackground, cardBackground } = getIssueCardVisual(issueLabel);
 
   return (
     <div
       className="preview-card coordinate-issue"
       style={{ cursor: 'default' }}
     >
-      <div className="preview-image-container" style={{ background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        className="preview-image-container"
+        style={{ background: cardBackground, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
         <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⚠️</div>
-          {labelLines.map((line) => (
-            <div key={line} style={{ fontSize: '0.85rem', fontWeight: '500' }}>{line}</div>
-          ))}
+          <div
+            style={{
+              width: '3.25rem',
+              height: '3.25rem',
+              margin: '0 auto 0.65rem',
+              borderRadius: '999px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: accentBackground,
+              color: accentColor
+            }}
+          >
+            <Icon size={28} strokeWidth={2.2} />
+          </div>
+          <div style={{ fontSize: '0.95rem', fontWeight: '500', lineHeight: 1.2, maxWidth: '8.5rem' }}>
+            {issueLabel}
+          </div>
         </div>
       </div>
       <div className="preview-footer">
         <span className="preview-title" title={imagePath}>{fileName}</span>
-        <span className="preview-badge" style={{ background: 'rgba(168, 85, 247, 0.3)', color: '#d8b4fe' }}>{pointsCount} pts</span>
+        <span className="preview-badge" style={{ background: accentBackground, color: accentColor }}>{pointsCount} pts</span>
       </div>
       <div style={{ padding: '0 1rem 1rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
         {folderPath}
@@ -295,7 +393,7 @@ export default function PreviewGridPanel({
             {selectedFloorEntries.map(([floorName, items]) => {
               const issueItems = selectedIssueFloors?.get(floorName) ?? [];
               const hasAnyItems = items.length > 0 || issueItems.length > 0;
-              
+
               if (!hasAnyItems) {
                 return null;
               }

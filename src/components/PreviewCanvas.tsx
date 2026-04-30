@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ImageOff } from 'lucide-react';
 import type { Annotation, AppFileHandle, RenderOptions } from '../types';
 import { getSafeRenderPlan } from '../utils/imageRendering';
 
@@ -92,13 +93,16 @@ function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps)
           width: '100%',
           height: '100%',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           color: 'var(--text-secondary)',
+          gap: '0.5rem',
           fontWeight: 500
         }}
       >
-        Missing
+        <ImageOff size={30} strokeWidth={2.2} />
+        <span>Image Missing in Folder</span>
       </div>
     );
   }
