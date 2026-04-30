@@ -651,7 +651,7 @@ export function useAssetAnnotationWorkflow() {
       const zip = new JSZip();
       const entries = Array.from(dataMap.entries()).filter(([imgName]) => imageHandles.has(imgName));
       const total = entries.length;
-      const maxWorkers = Math.max(1, Math.min(3, (typeof navigator !== 'undefined' ? Math.floor((navigator.hardwareConcurrency || 4) / 2) : 2)));
+      const maxWorkers = Math.max(1, Math.min(2, (typeof navigator !== 'undefined' ? Math.floor((navigator.hardwareConcurrency || 4) / 3) : 2)));
 
       if (total === 0) {
         toast('Warning: No matching images found to export.', {

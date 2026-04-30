@@ -135,7 +135,12 @@ function PreviewCard({ imagePath, annotations, handle, onOpen, options }: Previe
         </div>
       ) : (
         <div className="preview-image-container">
-          <PreviewCanvas fileHandle={handle} annotations={annotations} options={options} />
+          <PreviewCanvas
+            fileHandle={handle}
+            annotations={annotations}
+            options={options}
+            deferUntilVisible
+          />
         </div>
       )}
       <div className="preview-footer">

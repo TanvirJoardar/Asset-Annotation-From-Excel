@@ -7,18 +7,51 @@ interface PreviewCanvasProps {
   fileHandle?: AppFileHandle;
   annotations: Annotation[];
   options: RenderOptions;
+  deferUntilVisible?: boolean;
 }
 
-function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps) {
+function PreviewCanvas({
+  fileHandle,
+  annotations,
+  options,
+  deferUntilVisible = false
+}: PreviewCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [isDownscaled, setIsDownscaled] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [shouldRender, setShouldRender] = useState(!deferUntilVisible);
+
+  useEffect(() => {
+    if (!deferUntilVisible) {
+      setShouldRender(true);
+      return;
+    }
+
+    const element = containerRef.current;
+    if (!element || shouldRender) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldRender(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '240px 0px' }
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [deferUntilVisible, shouldRender]);
 
   useEffect(() => {
     let active = true;
 
     const renderPreview = async () => {
-      if (!fileHandle || !canvasRef.current) {
+      if (!shouldRender || !fileHandle || !canvasRef.current) {
         setRenderError(null);
         setIsDownscaled(false);
         return;
@@ -45,6 +78,7 @@ function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps)
 
         canvas.width = renderPlan.width;
         canvas.height = renderPlan.height;
+        ctx.clearRect(0, 0, renderPlan.width, renderPlan.height);
         ctx.drawImage(bmp, 0, 0, renderPlan.width, renderPlan.height);
 
         const radius = Math.max(1, options.radius * renderPlan.scale);
@@ -84,11 +118,12 @@ function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps)
     return () => {
       active = false;
     };
-  }, [fileHandle, annotations, options]);
+  }, [annotations, fileHandle, options, shouldRender]);
 
   if (!fileHandle) {
     return (
       <div
+        ref={containerRef}
         style={{
           width: '100%',
           height: '100%',
@@ -110,6 +145,7 @@ function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps)
   if (renderError) {
     return (
       <div
+        ref={containerRef}
         style={{
           width: '100%',
           height: '100%',
@@ -129,8 +165,32 @@ function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps)
   }
 
   return (
-    <>
-      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      {!shouldRender && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--text-secondary)',
+            fontWeight: 500
+          }}
+        >
+          Loading preview...
+        </div>
+      )}
+      <canvas
+        ref={canvasRef}
+        style={{
+          display: shouldRender ? 'block' : 'none',
+          width: '100%',
+          height: '100%'
+        }}
+      />
       {isDownscaled && (
         <div
           style={{
@@ -150,7 +210,7 @@ function PreviewCanvas({ fileHandle, annotations, options }: PreviewCanvasProps)
           Scaled Preview
         </div>
       )}
-    </>
+    </div>
   );
 }
 
