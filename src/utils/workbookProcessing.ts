@@ -350,8 +350,12 @@ export const buildProcessedWorkbook = async (
 
     if (colBackgroundImage !== -1) {
       const conflictKey = `${block.toLowerCase()}|${level.toLowerCase()}`;
-      const selectedImageFix = options.backgroundImageFixByBlockLevel?.[conflictKey];
-      if (selectedImageFix) {
+      const hasSelectedImageFix = Object.prototype.hasOwnProperty.call(
+        options.backgroundImageFixByBlockLevel ?? {},
+        conflictKey
+      );
+      const selectedImageFix = options.backgroundImageFixByBlockLevel?.[conflictKey] ?? '';
+      if (hasSelectedImageFix) {
         row[colBackgroundImage] = selectedImageFix;
       }
 
@@ -479,11 +483,21 @@ export const buildProcessedWorkbook = async (
   }
 
   const blockLevelBackgroundImageConflicts = Array.from(blockLevelImageMap.values())
+    .filter((entry) => normalize(entry.blockName).toLowerCase() !== 'blank')
     .filter((entry) => entry.imageNameMap.size > 1 || (entry.blankCount > 0 && entry.imageNameMap.size > 0))
     .map((entry) => ({
       blockName: entry.blockName,
       levelName: entry.levelName,
-      imageStats: Array.from(entry.imageNameMap.values()).sort((a, b) => {
+      imageStats: [
+        ...Array.from(entry.imageNameMap.values()),
+        ...(entry.blankCount > 0 ? [{ imageName: '', count: entry.blankCount }] : [])
+      ].sort((a, b) => {
+        if (!a.imageName && b.imageName) {
+          return 1;
+        }
+        if (a.imageName && !b.imageName) {
+          return -1;
+        }
         if (b.count !== a.count) {
           return b.count - a.count;
         }

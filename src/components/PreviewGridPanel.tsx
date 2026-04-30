@@ -31,6 +31,8 @@ const getBlockName = (path: string): string => {
   return first ?? 'root';
 };
 
+const shouldShowBlock = (blockName: string): boolean => blockName.toLowerCase() !== 'unassigned block';
+
 const getFloorName = (path: string): string => {
   const segments = getPathSegments(path);
   if (segments.length <= 2) {
@@ -143,6 +145,10 @@ export default function PreviewGridPanel({
 
     for (const [imagePath, annotations] of dataMap.entries()) {
       const blockName = getBlockName(imagePath);
+      if (!shouldShowBlock(blockName)) {
+        continue;
+      }
+
       const floorName = getFloorName(imagePath);
       const floors = blockMap.get(blockName) ?? new Map<string, Array<[string, Annotation[]]>>();
       const images = floors.get(floorName) ?? [];
@@ -173,6 +179,10 @@ export default function PreviewGridPanel({
 
     for (const imagePath of coordinateIssueKeys) {
       const blockName = getBlockName(imagePath);
+      if (!shouldShowBlock(blockName)) {
+        continue;
+      }
+
       const floorName = getFloorName(imagePath);
       const floors = blockMap.get(blockName) ?? new Map<string, string[]>();
       const images = floors.get(floorName) ?? [];

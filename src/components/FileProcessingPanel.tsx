@@ -455,16 +455,17 @@ export default function FileProcessingPanel({
                       {item.imageStats.map((imageInfo) => {
                         const conflictKey = buildConflictKey(item.blockName, item.levelName);
                         const isSelected = selectedConflictImageByKey[conflictKey] === imageInfo.imageName;
+                        const imageLabel = imageInfo.imageName || 'Blank';
 
                         return (
                           <button
-                            key={imageInfo.imageName}
+                            key={imageInfo.imageName || '__blank__'}
                             type="button"
                             className={`issue-image-pill selectable ${isSelected ? 'selected' : ''}`}
-                            title={`${imageInfo.imageName} (${imageInfo.count})`}
+                            title={`${imageLabel} (${imageInfo.count})`}
                             onClick={() => onSelectConflictImage(conflictKey, imageInfo.imageName)}
                           >
-                            <span className="issue-image-pill-name">{imageInfo.imageName}</span>
+                            <span className="issue-image-pill-name">{imageLabel}</span>
                             <span className="issue-image-pill-count">{imageInfo.count}</span>
                           </button>
                         );

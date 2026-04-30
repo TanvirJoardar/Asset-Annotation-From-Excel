@@ -36,12 +36,6 @@ const extractLevelFromText = (value: string): string | null => {
   return match ? match[1].toUpperCase() : null;
 };
 
-const extractBlockFromText = (value: string): string | null => {
-  const normalized = normalizeText(value);
-  const [firstToken] = normalized.split(/[_\s-]+/).filter(Boolean);
-  return firstToken ?? null;
-};
-
 const sanitizePathPart = (value: string, fallback: string): string => {
   const cleaned = normalizeText(value).replace(/[\\/]+/g, '-');
   return cleaned || fallback;
@@ -64,7 +58,7 @@ const buildDefaultConflictSelections = (summary: ProcessingSummary): Record<stri
     }
 
     const bestImage = item.imageStats[0]?.imageName;
-    if (bestImage) {
+    if (bestImage !== undefined) {
       selections[buildConflictKey(item.blockName, item.levelName)] = bestImage;
     }
   }
@@ -99,12 +93,7 @@ const resolveBlockAndLevel = (
   let resolvedLevel = normalizeText(level);
 
   const pathSegments = normalizeText(matchedImagePath).replace(/\\/g, '/').split('/').filter(Boolean);
-  const blockFromPath = pathSegments[0] ?? '';
   const levelFromPath = pathSegments.length > 2 ? pathSegments.slice(1, -1).join('/') : '';
-
-  if (isUnknownValue(resolvedBlock) && blockFromPath) {
-    resolvedBlock = blockFromPath;
-  }
 
   if (isUnknownValue(resolvedLevel)) {
     if (levelFromPath) {
@@ -115,13 +104,6 @@ const resolveBlockAndLevel = (
       if (levelFromName) {
         resolvedLevel = levelFromName;
       }
-    }
-  }
-
-  if (isUnknownValue(resolvedBlock)) {
-    const blockFromName = extractBlockFromText(imageName);
-    if (blockFromName) {
-      resolvedBlock = blockFromName;
     }
   }
 
@@ -139,6 +121,31 @@ const resolveBlockAndLevel = (
   };
 };
 
+const resolveIssueBlockAndLevel = (
+  block: string,
+  level: string
+): { block: string; level: string } => {
+  const resolvedBlock = normalizeText(block);
+  const resolvedLevel = normalizeText(level);
+
+  return {
+    block: isUnknownValue(resolvedBlock) ? 'Unassigned Block' : resolvedBlock,
+    level: isUnknownValue(resolvedLevel) ? 'Unassigned Level' : resolvedLevel
+  };
+};
+
+const hasBlockFolder = (
+  imageFiles: DiscoveredImageFile[],
+  block: string
+): boolean => {
+  const blockLower = normalizeKeyPart(block);
+  if (!blockLower || isUnknownValue(block)) {
+    return true;
+  }
+
+  return imageFiles.some((file) => file.segmentsLower.includes(blockLower));
+};
+
 const pickImageForGroup = (
   imageFiles: DiscoveredImageFile[],
   block: string,
@@ -149,9 +156,10 @@ const pickImageForGroup = (
   const levelLower = normalizeKeyPart(level);
   const imageNameLower = normalizeKeyPart(imageName);
 
-  const sameName = imageFiles.filter((file) => file.fileNameLower === imageNameLower);
-  const inBlock = blockLower ? sameName.filter((file) => file.segmentsLower.includes(blockLower)) : sameName;
-  const pool = inBlock.length > 0 ? inBlock : sameName;
+  const blockPool = blockLower && !isUnknownValue(block)
+    ? imageFiles.filter((file) => file.segmentsLower.includes(blockLower))
+    : imageFiles;
+  const pool = blockPool.filter((file) => file.fileNameLower === imageNameLower);
 
   if (pool.length === 0) {
     return undefined;
@@ -527,7 +535,10 @@ export function useAssetAnnotationWorkflow() {
       });
 
       for (const group of sortedGroups) {
-        const matchedImage = pickImageForGroup(availableImageFiles, group.block, group.level, group.imageName);
+        const blockFolderExists = hasBlockFolder(availableImageFiles, group.block);
+        const matchedImage = blockFolderExists
+          ? pickImageForGroup(availableImageFiles, group.block, group.level, group.imageName)
+          : undefined;
         const { block: resolvedBlock, level: resolvedLevel } = resolveBlockAndLevel(
           group.block,
           group.level,
@@ -540,6 +551,13 @@ export function useAssetAnnotationWorkflow() {
           matchedImage ? matchedImage.path : group.imageName
         );
 
+        if (!blockFolderExists) {
+          coordinateIssueKeysSet.add(outputPath);
+          coordinateIssueCountsMap.set(outputPath, group.annotations.length);
+          coordinateIssueLabelsMap.set(outputPath, 'Missing Folder');
+          continue;
+        }
+
         nextDataMap.set(outputPath, group.annotations);
         if (matchedImage) {
           nextImageHandles.set(outputPath, matchedImage.handle);
@@ -547,7 +565,10 @@ export function useAssetAnnotationWorkflow() {
       }
 
       for (const issueGroup of annotationData.coordinateIssueGroups) {
-        const matchedImage = pickImageForGroup(availableImageFiles, issueGroup.block, issueGroup.level, issueGroup.imageName);
+        const blockFolderExists = hasBlockFolder(availableImageFiles, issueGroup.block);
+        const matchedImage = blockFolderExists
+          ? pickImageForGroup(availableImageFiles, issueGroup.block, issueGroup.level, issueGroup.imageName)
+          : undefined;
         const { block: resolvedBlock, level: resolvedLevel } = resolveBlockAndLevel(
           issueGroup.block,
           issueGroup.level,
@@ -561,14 +582,14 @@ export function useAssetAnnotationWorkflow() {
         );
         coordinateIssueKeysSet.add(outputPath);
         coordinateIssueCountsMap.set(outputPath, issueGroup.invalidCount);
-        coordinateIssueLabelsMap.set(outputPath, 'Coordinates Missing');
+        coordinateIssueLabelsMap.set(outputPath, blockFolderExists ? 'Coordinates Missing' : 'Missing Folder');
       }
 
       for (const issueGroup of annotationData.backgroundImageIssueGroups) {
-        const { block: resolvedBlock, level: resolvedLevel } = resolveBlockAndLevel(
+        const blockFolderExists = hasBlockFolder(availableImageFiles, issueGroup.block);
+        const { block: resolvedBlock, level: resolvedLevel } = resolveIssueBlockAndLevel(
           issueGroup.block,
-          issueGroup.level,
-          issueGroup.imageName
+          issueGroup.level
         );
         const outputPath = buildOutputPath(
           resolvedBlock,
@@ -577,7 +598,7 @@ export function useAssetAnnotationWorkflow() {
         );
         coordinateIssueKeysSet.add(outputPath);
         coordinateIssueCountsMap.set(outputPath, issueGroup.missingCount);
-        coordinateIssueLabelsMap.set(outputPath, 'Background Image Name Missing');
+        coordinateIssueLabelsMap.set(outputPath, blockFolderExists ? 'Background Image Name Missing' : 'Missing Folder');
       }
 
       setDataMap(nextDataMap);
